@@ -1,41 +1,24 @@
 {
-  description = "Simple haskell nix flake";
+  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+  inputs.nci.url = "github:yusdacra/nix-cargo-integration";
+  inputs.nci.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.parts.url = "github:hercules-ci/flake-parts";
+  inputs.parts.inputs.nixpkgs-lib.follows = "nixpkgs";
 
-  inputs = {
-    nixpkgs.url = "nixpkgs/nixos-23.11";
-
-    flake-utils = {
-      url = "github:numtide/flake-utils";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-  };
-
-  outputs = { flake-utils, nixpkgs, self }:
-    flake-utils.lib.eachDefaultSystem (system:
-      let
-        config = { };
-        overlays = [ ];
-        pkgs = import nixpkgs { inherit config overlays system; };
-      in rec {
-        devShell = pkgs.haskellPackages.shellFor {
-          packages = p:
-            [
-
-            ];
-
-          buildInputs = with pkgs.haskellPackages; [
-            cabal-install
-
-            # Helpful tools for `nix develop` shells
-            #
-            ghcid # https://github.com/ndmitchell/ghcid
-            haskell-language-server # https://github.com/haskell/haskell-language-server
-            hlint # https://github.com/ndmitchell/hlint
-            ormolu # https://github.com/tweag/ormolu
-            #brittany
-          ];
-
-          withHoogle = true;
+  outputs = inputs@{ parts, nci, ... }:
+    parts.lib.mkFlake { inherit inputs; } {
+      systems = [ "x86_64-linux" ];
+      imports = [ nci.flakeModule ./crates.nix ];
+      perSystem = { pkgs, config, ... }:
+        let
+          # shorthand for accessing this crate's outputs
+          # you can access crate outputs under `config.nci.outputs.<crate name>` (see documentation)
+          crateOutputs = config.nci.outputs."lambdasee";
+        in {
+          # export the crate devshell as the default devshell
+          devShells.default = crateOutputs.devShell;
+          # export the release package of the crate as default package
+          packages.default = crateOutputs.packages.release;
         };
-      });
+    };
 }
