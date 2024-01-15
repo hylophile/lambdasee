@@ -1,115 +1,192 @@
-module Main where
+module Main (main) where
 
--- import System.Environment
-import Text.ParserCombinators.Parsec
+import Control.Monad (void)
+import Text.Megaparsec
+import Text.Megaparsec.Char
+import Text.Megaparsec.Char.Lexer qualified as L
 
-main :: IO ()
-main = do
-    putStrLn $ readExpr "(\\a:B.(y u))"
-    putStrLn $ readExpr "(λx:α.(y u))"
-    putStrLn $ readExpr "(λy : α . (y u))"
-    putStrLn $ readExpr "(y u)"
-    putStrLn $ readExpr "ident"
-    putStrLn $ readExpr "(λα : ∗ . (Πx:α.bottom))A" -- TODO not exhaustive ???
-    putStrLn $ readExpr "((λα : ∗ . (Πx:α.bottom)) A)"
-{- $>
-main
-<$
--}
+-- import Text.Megaparsec.Expr
+import Control.Monad.Combinators.Expr
 
--- newtype AVariable = String
--- data LambdaExpr where
---     LambdaAbstraction :: Variable -> LambdaExpr -> LambdaExpr
---     Variable :: String -> LambdaExpr
---     Application :: LambdaExpr -> LambdaExpr -> LambdaExpr
-data LambdaExpr
-    = Variable String
-    | Box
-    | Star
-    | Application LambdaExpr LambdaExpr
-    | LambdaAbstraction LambdaExpr (Maybe LambdaExpr) LambdaExpr
-    | PiAbstraction LambdaExpr (Maybe LambdaExpr) LambdaExpr
+import Data.Void
+
+type Parser = Parsec Void String
+
+data BExpr
+    = BoolConst Bool
+    | Not BExpr
+    | BBinary BBinOp BExpr BExpr
+    | RBinary RBinOp AExpr AExpr
     deriving (Show)
 
-parseVariable :: Parser LambdaExpr
-parseVariable = do
-    x <- many1 letter
-    return $ Variable x
+data BBinOp
+    = And
+    | Or
+    deriving (Show)
 
-parseBox :: Parser LambdaExpr
-parseBox = do
-    _ <-
-        char '!' -- Firefox & Chrome
-            <|> char '□'
-            <|> char '#'
-    return Box
+data RBinOp
+    = Greater
+    | Less
+    deriving (Show)
 
-parseStar :: Parser LambdaExpr
-parseStar = do
-    _ <- char '∗' <|> char '*'
-    return Star
+data AExpr
+    = Var String
+    | IntConst Integer
+    | Neg AExpr
+    | ABinary ABinOp AExpr AExpr
+    deriving (Show)
 
--- ∅(∗ : !
--- E = V | ! | ∗ |(EE)|(λV : E . E)|(ΠV : E . E) .
--- {(∗, ∗), (!, ∗)},
-parseApplication :: Parser LambdaExpr
-parseApplication = do
-    _ <- char '('
-    a <- parseExpr
-    _ <- spaces
-    b <- parseExpr
-    _ <- char ')'
-    return $ Application a b
+data ABinOp
+    = Add
+    | Subtract
+    | Multiply
+    | Divide
+    deriving (Show)
 
-parseLambdaAbstraction :: Parser LambdaExpr
-parseLambdaAbstraction = do
-    _ <- char '('
-    _ <- char '\\' <|> char 'λ'
-    x <- parseExpr -- TODO only Variable
-    -- TODO type optional?
-    _ <- spaces
-    _ <- char ':'
-    _ <- spaces
-    xType <- parseExpr
-    -- type end
-    _ <- spaces
-    _ <- char '.'
-    _ <- spaces
-    body <- parseExpr
-    _ <- char ')'
-    return $ LambdaAbstraction x (Just xType) body
+data Stmt
+    = Seq [Stmt]
+    | Assign String AExpr
+    | If BExpr Stmt Stmt
+    | While BExpr Stmt
+    | Skip
+    deriving (Show)
 
--- TODO arrow notation: A → B for Πx : A . B,  in case x \not\in FV (B)
-parsePiAbstraction :: Parser LambdaExpr
-parsePiAbstraction = do
-    _ <- char '('
-    _ <- char 'Π' <|> char '/'
-    x <- parseExpr -- TODO only Variable
-    -- TODO type optional?
-    _ <- spaces
-    _ <- char ':'
-    _ <- spaces
-    xType <- parseExpr
-    -- type end
-    _ <- spaces
-    _ <- char '.'
-    _ <- spaces
-    body <- parseExpr
-    _ <- char ')'
-    return $ PiAbstraction x (Just xType) body
+sc :: Parser ()
+sc = L.space (void spaceChar) lineCmnt blockCmnt
+  where
+    lineCmnt = L.skipLineComment "//"
+    blockCmnt = L.skipBlockComment "/*" "*/"
 
-parseExpr :: Parser LambdaExpr
-parseExpr =
-    parseVariable
-        <|> parseBox
-        <|> parseStar
-        <|> try parseApplication
-        <|> try parseLambdaAbstraction
-        <|> parsePiAbstraction
+lexeme :: Parser a -> Parser a
+lexeme = L.lexeme sc
 
-readExpr :: String -> String
-readExpr input = case parse parseExpr "lisp" input of
-    Left err -> "No match: " ++ show err
-    Right v -> show v
+symbol :: String -> Parser String
+symbol = L.symbol sc
 
--- TODO parseJudgement
+-- | 'parens' parses something between parenthesis.
+parens :: Parser a -> Parser a
+parens = between (symbol "(") (symbol ")")
+
+-- | 'integer' parses an integer.
+integer :: Parser Integer
+integer = lexeme L.decimal
+
+-- | 'semi' parses a semicolon.
+semi :: Parser String
+semi = symbol ";"
+
+rword :: String -> Parser ()
+rword w = string w *> notFollowedBy alphaNumChar *> sc
+
+rws :: [String] -- list of reserved words
+rws = ["if", "then", "else", "while", "do", "skip", "true", "false", "not", "and", "or"]
+
+identifier :: Parser String
+identifier = (lexeme . try) (p >>= check)
+  where
+    p = (:) <$> letterChar <*> many alphaNumChar
+    check x =
+        if x `elem` rws
+            then fail $ "keyword " ++ show x ++ " cannot be an identifier"
+            else return x
+
+whileParser :: Parser Stmt
+whileParser = between sc eof stmt
+
+stmt :: Parser Stmt
+stmt = parens stmt <|> stmtSeq
+
+stmtSeq :: Parser Stmt
+stmtSeq = f <$> sepBy1 stmt' semi
+  where
+    -- if there's only one stmt return it without using ‘Seq’
+    f l = if length l == 1 then head l else Seq l
+
+stmt' :: Parser Stmt
+stmt' = ifStmt <|> whileStmt <|> skipStmt <|> assignStmt
+
+ifStmt :: Parser Stmt
+ifStmt = do
+    rword "if"
+    cond <- bExpr
+    rword "then"
+    stmt1 <- stmt
+    rword "else"
+    stmt2 <- stmt
+    return (If cond stmt1 stmt2)
+
+whileStmt :: Parser Stmt
+whileStmt = do
+    rword "while"
+    cond <- bExpr
+    rword "do"
+    stmt1 <- stmt
+    return (While cond stmt1)
+
+assignStmt :: Parser Stmt
+assignStmt = do
+    var <- identifier
+    void (symbol ":=")
+    expr <- aExpr
+    return (Assign var expr)
+
+skipStmt :: Parser Stmt
+skipStmt = Skip <$ rword "skip"
+
+aExpr :: Parser AExpr
+aExpr = makeExprParser aTerm aOperators
+
+bExpr :: Parser BExpr
+bExpr = makeExprParser bTerm bOperators
+
+aOperators :: [[Operator Parser AExpr]]
+aOperators =
+    [ [Prefix (Neg <$ symbol "-")]
+    ,
+        [ InfixL (ABinary Multiply <$ symbol "*")
+        , InfixL (ABinary Divide <$ symbol "/")
+        ]
+    ,
+        [ InfixL (ABinary Add <$ symbol "+")
+        , InfixL (ABinary Subtract <$ symbol "-")
+        ]
+    ]
+
+bOperators :: [[Operator Parser BExpr]]
+bOperators =
+    [ [Prefix (Not <$ rword "not")]
+    ,
+        [ InfixL (BBinary And <$ rword "and")
+        , InfixL (BBinary Or <$ rword "or")
+        ]
+    ]
+
+aTerm :: Parser AExpr
+aTerm =
+    parens aExpr
+        <|> Var
+        <$> identifier
+            <|> IntConst
+        <$> integer
+
+bTerm :: Parser BExpr
+bTerm =
+    parens bExpr
+        <|> (rword "true" *> pure (BoolConst True))
+        <|> (rword "false" *> pure (BoolConst False))
+        <|> rExpr
+
+rExpr :: Parser BExpr
+rExpr = do
+    a1 <- aExpr
+    op <- relation
+    a2 <- aExpr
+    return (RBinary op a1 a2)
+
+relation :: Parser RBinOp
+relation =
+    (symbol ">" *> pure Greater)
+        <|> (symbol "<" *> pure Less)
+
+main :: IO ()
+main = return ()
