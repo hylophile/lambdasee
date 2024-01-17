@@ -98,7 +98,7 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
         .parse(pairs)
 }
 
-fn main() -> io::Result<()> {
+fn miain() -> io::Result<()> {
     let line = "(Πx : S . (A → P x)) → A → Πy : S . P y";
     // let line = "∅ ⊢ λα : ∗ . λβ : (∗ → ∗) . β(β α) : ∗ → (∗ → ∗) → ∗";
     // let line = "α : ∗ . λβ : ∗ . α → β : e";
@@ -127,4 +127,19 @@ fn main() -> io::Result<()> {
         } // }
     }
     Ok(())
+}
+
+#[macro_use]
+extern crate rocket;
+use rocket::fs::FileServer;
+#[post("/hi")]
+fn index() -> &'static str {
+    "Hello, world!"
+}
+
+#[launch]
+fn rocket() -> _ {
+    rocket::build()
+        .mount("/api", routes![index])
+        .mount("/", FileServer::from("src/html/"))
 }
