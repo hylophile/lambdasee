@@ -13,11 +13,12 @@
    .error {
        color: red;
    }
+
   </style>
 </head>
 <body>
     <div>
-<input type="text" name="query"
+<input type="text" name="query" size=80
     hx-get="/parse"
     hx-trigger="keyup[key == 'Enter' || document.querySelector('#auto').checked]"
     hx-target="#result"
