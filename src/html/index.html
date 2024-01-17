@@ -1,5 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.5">
+  <title>lambdasee</title>
   <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-  <!-- have a button POST a click via AJAX -->
-  <button hx-post="/api/hi" hx-swap="outerHTML">
-    Click Me
-  </button>
+  <style>
+   body {
+       margin: 10rem;
+   }
+
+   .error {
+       color: red;
+   }
+  </style>
+</head>
+<body>
+    <div>
+<input type="text" name="query"
+    hx-get="/parse"
+    hx-trigger="keyup[key == 'Enter' || document.querySelector('#auto').checked]"
+    hx-target="#result"
+    placeholder="Parse..."
+>
+<label>
+    auto
+<input type="checkbox" id="auto" checked>
+</label>
+
+<div id="result"></div>
+</div>
+
+</body>
+</html>

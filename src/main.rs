@@ -27,9 +27,8 @@ pub enum Expr {
     Ident(String),
     Star,
     Box,
-    BinOp {
+    Application {
         lhs: Box<Expr>,
-        op: Op,
         rhs: Box<Expr>,
     },
     LambdaAbstraction {
@@ -98,6 +97,41 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
         .parse(pairs)
 }
 
+fn p(input: &str) -> Result<String, pest::error::Error<Rule>> {
+    let line = "(Πx : S . (A → P x)) → A → Πy : S . P y";
+    // let line = "∅ ⊢ λα : ∗ . λβ : (∗ → ∗) . β(β α) : ∗ → (∗ → ∗) → ∗";
+    // let line = "α : ∗ . λβ : ∗ . α → β : e";
+    // let line = "(λα : ∗ . α → α) (γ → β)";
+    // let line = "(λα : ∗ . α → α) γ";
+    // let line = "(Πy : S . P y)";
+    // let line = "a -> b";
+    // let line = "a";
+    // let line = "a b";
+    // let line = "a b c";
+
+    match CalculatorParser::parse(Rule::program, &input) {
+        Ok(mut pairs) => {
+            // let a = pairs.next().unwrap();
+            println!("p: {pairs}");
+            let a = pairs.next().unwrap().into_inner();
+            let x = parse_expr(a);
+            let s = format!("{:#?}", x);
+            Ok(s)
+            // println!("a: {a}");
+            // println!(
+            //     "Parsed: \n\n{:#?}",
+            //     // inner of expr
+            //     parse_expr(a)
+            // );
+        }
+        Err(e) => {
+            // eprintln!("Parse failed: {:?}", e);
+            Err(e)
+        } // }
+    }
+    // Ok(())
+}
+
 fn miain() -> io::Result<()> {
     let line = "(Πx : S . (A → P x)) → A → Πy : S . P y";
     // let line = "∅ ⊢ λα : ∗ . λβ : (∗ → ∗) . β(β α) : ∗ → (∗ → ∗) → ∗";
@@ -137,9 +171,20 @@ fn index() -> &'static str {
     "Hello, world!"
 }
 
+#[get("/parse?<query>")]
+fn parse(query: &str) -> String {
+    // format!("Hello, {}!", query)
+    match p(query) {
+        Ok(s) => {
+            format!("<pre>{s}</pre>")
+        }
+        Err(e) => format!("<span class='error'>Error!</span><pre>{:?}</pre>", e),
+    }
+}
+
 #[launch]
 fn rocket() -> _ {
     rocket::build()
-        .mount("/api", routes![index])
+        .mount("/", routes![index, parse])
         .mount("/", FileServer::from("src/html/"))
 }
