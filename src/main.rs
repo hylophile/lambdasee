@@ -37,7 +37,7 @@ pub enum Expr {
         body: Box<Expr>,
     },
     PiAbstraction {
-        ident: Box<Expr>,
+        ident: Option<Box<Expr>>,
         etype: Box<Expr>,
         body: Box<Expr>,
     },
@@ -71,24 +71,31 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
                 )));
                 let etype = Box::new(parse_expr(inner.next().unwrap().into_inner()));
                 let body = Box::new(parse_expr(inner.next().unwrap().into_inner()));
-                Expr::PiAbstraction { ident, etype, body }
+                Expr::PiAbstraction {
+                    ident: Some(ident),
+                    etype,
+                    body,
+                }
             }
             Rule::expr => parse_expr(primary.into_inner()),
             Rule::ident => Expr::Ident(primary.as_str().into()),
             rule => unreachable!("Expr::parse expected atom, found {:?}", rule),
         })
         // .map_body
-        .map_infix(|lhs, op, rhs| {
-            let op = match op.as_rule() {
-                Rule::arrow => Op::Arrow, // TODO convert to PiAbstraction
-                Rule::appl => Op::Application,
-                rule => unreachable!("Expr::parse expected infix operation, found {:?}", rule),
-            };
-            Expr::BinOp {
-                lhs: Box::new(lhs),
-                op,
-                rhs: Box::new(rhs),
+        .map_infix(|lhs, op, rhs| match op.as_rule() {
+            Rule::arrow => {
+                let ident = None; //Expr::Ident("_x_".to_string());
+                                  // let ident = Box::new(ident);
+
+                let etype = Box::new(lhs);
+                let body = Box::new(rhs);
+                Expr::PiAbstraction { ident, etype, body }
             }
+            Rule::appl => Expr::Application {
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+            },
+            rule => unreachable!("Expr::parse expected infix operation, found {:?}", rule),
         })
         // .map_prefix(|op, rhs| match op.as_rule() {
         //     Rule::unary_minus => Expr::UnaryMinus(Box::new(rhs)),
