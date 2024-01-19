@@ -1,4 +1,4 @@
-WHITESPACE = _{ " " | "\t" }
+WHITESPACE = _{ " " | "\t" | "\n" }
 ident      = @{ char+ }
 char       =  { 'α'..'ω' | 'a'..'z' | 'A'..'Z' }
 expr       = { primary ~ (infix ~ primary)* }
