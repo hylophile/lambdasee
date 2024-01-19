@@ -3,7 +3,10 @@ extern crate pest;
 use pest::iterators::Pairs;
 use pest::pratt_parser::PrattParser;
 use pest::Parser;
-use std::io::{self};
+use std::{
+    error::Error,
+    io::{self},
+};
 
 #[derive(pest_derive::Parser)]
 #[grammar = "grammar.pest"]
@@ -17,12 +20,12 @@ lazy_static::lazy_static! {
         // Precedence is defined lowest to highest
         PrattParser::new()
             // Addition and subtract have equal precedence
-            .op(Op::infix(appl, Left))
             .op(Op::infix(arrow, Right))
+            .op(Op::infix(appl, Left))
     };
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Expr {
     Identifier(String),
     Star,
@@ -50,12 +53,6 @@ pub enum Expr {
         expr: Box<Expr>,
         etype: Box<Expr>,
     },
-}
-
-#[derive(Debug)]
-pub enum Op {
-    Application,
-    Arrow,
 }
 
 pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
@@ -143,8 +140,74 @@ fn it_works() {
     );
     // println!("{x:?}");
 
-    let line = "C ⊢ λα : ∗ . λβ : (∗ → ∗) . β(β α) : ∗ → (∗ → ∗) → ∗";
-    println!("{:#?}", p(line));
+    // let line = "C ⊢ λα : ∗ . λβ : (∗ → ∗) . β(β α) : ∗ → (∗ → ∗) → ∗";
+    // println!("{:#?}", p(line));
+    // panic!();
+}
+
+fn f(e: Expr) -> String {
+    match e {
+        Expr::Identifier(s) => s.to_string(),
+        Expr::Star => "∗".to_string(),
+        Expr::Box => "□".to_string(),
+        Expr::Application { lhs, rhs } => {
+            format!("({} {})", f(*lhs), f(*rhs))
+        }
+        Expr::LambdaAbstraction { ident, etype, body } => {
+            format!("λ{} : {} . ({})", f(*ident), f(*etype), f(*body))
+        }
+        Expr::PiAbstraction { ident, etype, body } => match ident {
+            Some(i) => {
+                format!("Π{} : {} . ({})", f(*i), f(*etype), f(*body))
+            }
+            None => {
+                match (&*etype, &*body) {
+                    (Expr::Identifier(s1), Expr::Identifier(s2)) => format!("({s1} → {s2})"),
+                    (Expr::Star | Expr::Box, Expr::Star | Expr::Box) => {
+                        format!("({} → {})", f(*etype), f(*body))
+                    }
+                    _ => format!("({} → {})", f(*etype), f(*body)),
+                }
+
+                // format!("{} → {}", f(*etype), x)
+            }
+        },
+        Expr::FreeVariable { ident, etype } => {
+            format!("{} : {}", f(*ident), f(*etype))
+        }
+        Expr::Judgement {
+            context,
+            expr,
+            etype,
+        } => {
+            let mut context = context
+                .iter()
+                .map(|e| f((*e).clone()))
+                .collect::<Vec<_>>()
+                .join(", ");
+            if context == "" {
+                context = "Γ".to_string();
+            }
+            format!("{} ⊢ {} : {}", context, f(*expr), f(*etype))
+        }
+    }
+}
+
+#[test]
+fn e() {
+    let line = "a:b⊢a : (b)";
+    assert_eq!("a : b ⊢ a : b", f(p(line).unwrap()));
+
+    let line = "C ⊢ λα : ∗ . λβ : (∗ → ∗) . a b β(β α) : ∗ → (∗ → ∗) → ∗";
+    let line = "C ⊢ λα : ∗ . λβ : (∗ → ∗) . a b β(β α) : ∗ → ∗ → ∗ → ∗";
+    let line = "C |- (Πx : S . (A → P x)) → A → Πy : S . P y : kp";
+    // let line = "C |- (Πx : S . (A → P x)) : p";
+    // let line = "C |- A → P x : p";
+    // let line = "C ⊢ a : ∗ → (∗ → ∗) → ∗";
+    // let line = "C ⊢ a : a -> (* -> b) -> d";
+    let r = p(line).unwrap();
+    println!("{r:#?}");
+    assert_eq!("a : b ⊢ a : b", f(r));
     panic!();
 }
 
