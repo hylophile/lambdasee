@@ -157,11 +157,11 @@ fn f(e: Expr) -> String {
             format!("({} {})", f(*lhs), f(*rhs))
         }
         Expr::LambdaAbstraction { ident, etype, body } => {
-            format!("λ{} : {} . ({})", f(*ident), f(*etype), f(*body))
+            format!("(λ{} : {} . {})", f(*ident), f(*etype), f(*body))
         }
         Expr::PiAbstraction { ident, etype, body } => match ident {
             Some(i) => {
-                format!("Π{} : {} . ({})", f(*i), f(*etype), f(*body))
+                format!("(Π{} : {} . {})", f(*i), f(*etype), f(*body))
             }
             None => {
                 match (&*etype, &*body) {
