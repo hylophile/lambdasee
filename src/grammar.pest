@@ -1,9 +1,6 @@
 WHITESPACE = _{ " " | "\t" }
 ident      = @{ char+ }
 char       =  { 'α'..'ω' | 'a'..'z' | 'A'..'Z' }
-program    =  _{ SOI ~ expr ~ (NL ~ expr)* ~ EOI }
-single = _{SOI ~ expr ~ EOI}
-NL         =  { "\n" }
 expr       = { primary ~ (infix ~ primary)* }
 infix      = _{ arrow | appl }
 arrow      =  { "→" | "->"}
@@ -16,5 +13,17 @@ scope      =  _{ "(" ~ expr ~ ")" }
 primary    = _{ star | ebox | lambda | pi | ident | scope }
 pi         =  { "Π" ~ ident ~ ":" ~ etype ~ "." ~  body }
 lambda     =  { "λ" ~ ident ~ ":" ~ etype ~ "." ~ body }
-context    =  { "∅" | "todo" }
-judgement  =  { context ~ "⊢" ~ expr ~ ":" ~ expr }
+free_var  = {ident ~ ":" ~ etype}
+free_vars = _{free_var ~ ("," ~ free_var)*}
+gamma = _{"Γ" | "C"}
+empty_set = _{"∅" | "{}" | "0"}
+context    =  { empty_set | (gamma ~ ("," ~ free_vars)?) | free_vars }
+judges = _{"⊢" | "|-"}
+judgement  =  { context ~ judges ~ expr ~ ":" ~ etype }
+
+program    =  _{ SOI ~ expr ~ ("\n" ~ expr)* ~ EOI }
+
+// https://github.com/pest-parser/pest/issues/943
+pest_bug = {judgement}
+
+judgement_program = {SOI ~ pest_bug ~ EOI}
