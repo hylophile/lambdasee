@@ -1,36 +1,66 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.5">
-  <title>lambdasee</title>
-  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-  <style>
-   body {
-       margin: 10rem;
-   }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>lambdasee</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="prism.js"></script>
+    <link rel="stylesheet" href="prism.css" />
+    <style>
+      html {
+        font-size: 20px;
+        font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
+      }
+      body {
+        margin: 10rem;
+      }
+      label,
+      input {
+        font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
+      }
+      input {
+        font-size: 1.25rem;
+      }
+      .flex {
+        display: flex;
+        flex-direction: column;
+      }
+    </style>
+  </head>
+  <body>
+    <script type="module">
+      document
+        .querySelector("#result")
+        .addEventListener("htmx:afterSwap", () => {
+          Prism.highlightAll();
+        });
+    </script>
+    <div class="flex">
+      <h1 style="margin: 0 auto">λ•</h1>
+      <span style="margin: 0 auto">
+        parse, visualize, and (soon™) derive expressions of λC & friends
+      </span>
+      <hr />
+      <input
+        type="text"
+        name="query"
+        size="80"
+        id="query"
+        hx-get="/parse"
+        hx-trigger="keyup[key == 'Enter' || document.querySelector('#auto').checked]"
+        hx-target="#result"
+        placeholder="Parse..."
+        value="S : ∗, P : S → ∗, f : S → S ⊢ λx : S . ΠQ : S → ∗ . (Πz : S . (Q z → Q(f z))) → Q x : unknown"
+      />
 
-   .error {
-       color: red;
-   }
-
-  </style>
-</head>
-<body>
-    <div>
-<input type="text" name="query" size=80
-    hx-get="/parse"
-    hx-trigger="keyup[key == 'Enter' || document.querySelector('#auto').checked]"
-    hx-target="#result"
-    placeholder="Parse..."
->
-<label>
-    auto
-<input type="checkbox" id="auto" checked>
-</label>
-
-<div id="result"></div>
-</div>
-
-</body>
+      <label>
+        <input type="checkbox" id="auto" checked />
+        automatic reload
+      </label>
+      <div style="margin: 2rem 0">
+        <pre><code id="result" class="language-js rainbow-braces match-braces"> S : ∗, P : (S → ∗), f : (S → S) ⊢ λx : S . (ΠQ : (S → ∗) . ((Πz : S . (((Q z) → (Q (f z)))) → (Q x)))) : unknown </code></pre>
+      </div>
+    </div>
+  </body>
 </html>

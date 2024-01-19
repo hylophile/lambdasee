@@ -30,6 +30,7 @@ pub enum Expr {
     Identifier(String),
     Star,
     Box,
+    Bottom,
     Application {
         lhs: Box<Expr>,
         rhs: Box<Expr>,
@@ -60,6 +61,7 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
         .map_primary(|primary| match primary.as_rule() {
             // Rule::integer => Expr::Integer(primary.as_str().parse::<i32>().unwrap()),
             Rule::star => Expr::Star,
+            Rule::bottom => Expr::Bottom,
             Rule::lambda => {
                 let mut inner = primary.into_inner();
                 let ident = Box::new(parse_expr(pest::iterators::Pairs::single(
@@ -150,6 +152,7 @@ fn f(e: Expr) -> String {
         Expr::Identifier(s) => s.to_string(),
         Expr::Star => "∗".to_string(),
         Expr::Box => "□".to_string(),
+        Expr::Bottom => "⊥".to_string(),
         Expr::Application { lhs, rhs } => {
             format!("({} {})", f(*lhs), f(*rhs))
         }
@@ -298,7 +301,7 @@ fn parse(query: &str) -> String {
     // format!("Hello, {}!", query)
     match p(query) {
         Ok(s) => {
-            format!("<pre>{s:#?}</pre>")
+            format!("{}", f(s))
         }
         Err(e) => format!("<span class='error'>Error!</span><pre>{:?}</pre>", e),
     }
