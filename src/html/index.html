@@ -4,12 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>lambdasee</title>
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="htmx.js"></script>
     <script src="prism.js"></script>
     <link rel="stylesheet" href="prism.css" />
     <style>
       html {
-        font-size: 20px;
+        font-size: 18px;
         font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
       }
       body {
@@ -19,8 +19,10 @@
       input {
         font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
       }
-      input {
-        font-size: 1.25rem;
+      span[role="textbox"] {
+        font-size: 1rem;
+        border: 1px solid slategray;
+        margin 1em 0;
       }
       .flex {
         display: flex;
@@ -30,11 +32,29 @@
   </head>
   <body>
     <script type="module">
-      document
-        .querySelector("#result")
-        .addEventListener("htmx:afterSwap", () => {
-          Prism.highlightAll();
-        });
+      const result = document.querySelector("#result");
+      const queryInput = document.querySelector("#query");
+
+      result.addEventListener("htmx:afterSwap", () => {
+        Prism.highlightAll();
+      });
+
+      queryInput.addEventListener("input", () => {
+        window.location.hash =
+          "query=" + btoa(encodeURIComponent(queryInput.innerText));
+      });
+
+      window.addEventListener("load", () => {
+        const hashValue = window.location.hash.substring(1);
+        const encodedValue = hashValue.split("=")[1];
+
+        if (encodedValue) {
+          queryInput.innerText = decodeURIComponent(atob(encodedValue));
+          queryInput.dispatchEvent(new Event("input"));
+        }
+      });
+
+      window.normalize = (s) => s.replaceAll("\u{a0}", " ");
     </script>
     <div class="flex">
       <h1 style="margin: 0 auto">λ•</h1>
@@ -42,24 +62,26 @@
         parse, visualize, and (soon™) derive expressions of λC & friends
       </span>
       <hr />
-      <input
-        type="text"
+      <span
+        class="input"
+        role="textbox"
+        contenteditable
         name="query"
-        size="80"
+        style="resize: vertical"
         id="query"
         hx-get="/parse"
-        hx-trigger="keyup[key == 'Enter' || document.querySelector('#auto').checked]"
+        hx-trigger="input[key == 'Enter' || document.querySelector('#auto').checked]"
+        hx-vals="js: query:normalize(htmx.find('#query').innerText)"
         hx-target="#result"
         placeholder="Parse..."
-        value="S : ∗, P : S → ∗, f : S → S ⊢ λx : S . ΠQ : S → ∗ . (Πz : S . (Q z → Q(f z))) → Q x : unknown"
-      />
+      ></span>
 
       <label>
         <input type="checkbox" id="auto" checked />
         automatic reload
       </label>
       <div style="margin: 2rem 0">
-        <pre><code id="result" class="language-js rainbow-braces match-braces"> S : ∗, P : (S → ∗), f : (S → S) ⊢ λx : S . (ΠQ : (S → ∗) . ((Πz : S . (((Q z) → (Q (f z)))) → (Q x)))) : unknown </code></pre>
+        <pre><code id="result" class="language-js rainbow-braces match-braces"></code></pre>
       </div>
     </div>
   </body>
