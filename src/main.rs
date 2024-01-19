@@ -187,11 +187,11 @@ fn f(e: Expr) -> String {
                 .iter()
                 .map(|e| f((*e).clone()))
                 .collect::<Vec<_>>()
-                .join(", ");
+                .join(",\n");
             if context == "" {
                 context = "Γ".to_string();
             }
-            format!("{} ⊢ {} : {}", context, f(*expr), f(*etype))
+            format!("{} \n\n⊢ {} \n\n: {}", context, f(*expr), f(*etype))
         }
     }
 }
