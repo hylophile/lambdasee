@@ -57,6 +57,7 @@ fn parse_expr(pairs: Pairs<Rule>) -> Expr {
         .map_primary(|primary| match primary.as_rule() {
             // Rule::integer => Expr::Integer(primary.as_str().parse::<i32>().unwrap()),
             Rule::star => Expr::Star,
+            Rule::ebox => Expr::Box,
             Rule::bottom => Expr::Bottom,
             Rule::lambda => {
                 let mut inner = primary.into_inner();

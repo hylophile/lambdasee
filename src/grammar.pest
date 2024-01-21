@@ -1,30 +1,32 @@
-WHITESPACE = _{ " " | "\t" | "\n" }
-ident      = @{ char+ }
-char       =  { 'α'..'ω' | 'a'..'z' | 'A'..'Z' }
-expr       = { primary ~ (infix ~ primary)* }
-infix      = _{ arrow | appl }
-arrow      =  { "→" | "->"}
-appl       =  { "" }
-star       =  { "∗" | "*" }
-ebox        =  { "89" }
-body       =  { expr }
+WHITESPACE  = _{ " " | "\t" | "\n" }
+ident       = @{ char+ }
+char        =  { 'α'..'ω' | 'a'..'z' | 'A'..'Z' }
+expr        =  { primary ~ (infix ~ primary)* }
+infix       = _{ arrow | appl }
+arrow       =  { "→" | "->" }
+appl        =  { "" }
+star        =  { "∗" | "*" }
+ebox        =  { "□" | "#" }
+body        =  { expr }
 etype       =  { expr }
-scope      =  _{ "(" ~ expr ~ ")" }
-bottom = {"⊥" | "_|_"}
-primary    = _{ star | ebox |bottom| lambda | pi | ident | scope }
-pi         =  { "Π" ~ ident ~ ":" ~ etype ~ "." ~  body }
-lambda     =  { "λ" ~ ident ~ ":" ~ etype ~ "." ~ body }
-free_var  = {ident ~ ":" ~ etype}
-free_vars = _{free_var ~ ("," ~ free_var)*}
-gamma = _{"Γ" | "C"}
-empty_set = _{"∅" | "{}" | "0"}
-context    =  { empty_set | (gamma ~ ("," ~ free_vars)?) | free_vars }
-judges = _{"⊢" | "|-"}
-judgement  =  { context ~ judges ~ expr ~ ":" ~ etype }
+scope       = _{ "(" ~ expr ~ ")" }
+bottom      =  { "⊥" | "_|_" }
+primary     = _{ star | ebox | bottom | lambda | pi | ident | scope }
+pi_char     = _{ "Π" | "/" }
+pi          =  { pi_char ~ ident ~ ":" ~ etype ~ "." ~ body }
+lambda_char = _{ "λ" | "\\" }
+lambda      =  { lambda_char ~ ident ~ ":" ~ etype ~ "." ~ body }
+free_var    =  { ident ~ ":" ~ etype }
+free_vars   = _{ free_var ~ ("," ~ free_var)* }
+gamma       = _{ "Γ" | "C" }
+empty_set   = _{ "∅" | "{}" | "0" }
+context     =  { empty_set | (gamma ~ ("," ~ free_vars)?) | free_vars }
+judges      = _{ "⊢" | "|-" }
+judgement   =  { context ~ judges ~ expr ~ ":" ~ etype }
 
-program    =  _{ SOI ~ expr ~ ("\n" ~ expr)* ~ EOI }
+program = _{ SOI ~ expr ~ ("\n" ~ expr)* ~ EOI }
 
 // https://github.com/pest-parser/pest/issues/943
-pest_bug = {judgement}
+pest_bug = { judgement }
 
-judgement_program = {SOI ~ pest_bug ~ EOI}
+judgement_program = { SOI ~ pest_bug ~ EOI }
