@@ -194,12 +194,14 @@ pub fn stringify(e: Expr) -> String {
                 .iter()
                 .map(|e| stringify((*e).clone()))
                 .collect::<Vec<_>>()
-                .join(",\n");
+                // .join(",\n");
+                .join(", ");
             if context == "" {
                 context = "Γ".to_string();
             }
             format!(
-                "{} \n\n⊢ {} \n\n: {}",
+                // "{} \n\n⊢ {} \n\n: {}",
+                "{} ⊢ {} : {}",
                 context,
                 stringify(*expr),
                 stringify(*etype)
