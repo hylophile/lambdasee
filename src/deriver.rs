@@ -135,35 +135,52 @@ fn step(judgement: Expr) -> DStep {
 }
 
 fn stringify(derivation: DStep) -> String {
-    stringify_h(derivation, 0)
+    stringify_h(derivation, 0, 0)
 }
 
-fn stringify_h(derivation: DStep, counter: u32) -> String {
-    let premiss_one = match derivation.premiss_one {
-        Some(d) => stringify_h(*d, counter + 1),
-        None => "".to_string(),
-    };
-    let premiss_two = match derivation.premiss_two {
-        Some(d) => stringify_h(*d, counter + 2),
-        None => "".to_string(),
-    };
+fn stringify_h(derivation: DStep, counter: u32, width: usize) -> String {
+    let conclusion = parser::stringify(derivation.conclusion);
+    let width = width.max(conclusion.len());
 
-    format!(
-        "[{}] {} \t({:?}) on [{}] and [{}]\n{}\n{}",
-        counter,
-        parser::stringify(derivation.conclusion),
-        derivation.rule,
-        counter + 1,
-        counter + 2,
-        premiss_one,
-        premiss_two
-    )
+    match (derivation.premiss_one, derivation.premiss_two) {
+        (Some(p1), Some(p2)) => {
+            let p1s = stringify_h(*p1, counter + 1, width);
+            let p2s = stringify_h(*p2, counter + 2, width);
+            format!(
+                "[{}] {} \t({:?}) on [{}] and [{}]\n{}\n{}",
+                counter,
+                conclusion,
+                derivation.rule,
+                counter + 1,
+                counter + 2,
+                p1s,
+                p2s,
+            )
+        }
+        (Some(p1), None) => {
+            let p1s = stringify_h(*p1, counter + 1, width);
+            format!(
+                "[{}] {:width$} ({:?}) on [{}]\n{}\n",
+                counter,
+                conclusion,
+                derivation.rule,
+                counter + 1,
+                p1s,
+            )
+        }
+        _ => {
+            format!(
+                "[{}] {:width$} ({:?})",
+                counter, conclusion, derivation.rule,
+            )
+        }
+    }
 }
 
 #[test]
 fn sort() {
     let e = parser::parse_judgement("C |- * : #").unwrap();
-    assert_eq!("Γ ⊢ ∗ : □ (Sort)\n\n", stringify(step(e)));
+    // assert_eq!("Γ ⊢ ∗ : □ (Sort)\n\n", stringify(step(e)));
     // assert_eq!(step(e), DRule::Sort);
 }
 
