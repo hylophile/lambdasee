@@ -91,6 +91,10 @@
         Prism.highlightAll();
       });
 
+      document.addEventListener("htmx:responseError", () => {
+        deriveResult.innerHTML = "TODO: server panic.";
+      });
+
       deriveResult.addEventListener("htmx:afterSwap", () => {
         deriveResult.innerHTML = "  " + deriveResult.innerHTML;
         Prism.highlightAll();
@@ -147,7 +151,6 @@
         >
           Derive
         </button>
-        <span>(If nothing happens, the derivation failed.)</span>
         <pre><code id="derive-result" class="language-lisp rainbow-braces match-braces"></code></pre>
       </div>
     </div>
