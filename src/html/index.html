@@ -17,8 +17,12 @@
            margin: 10rem;
          }
          label,
-         input {
+         input,
+         button {
            font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
+         }
+         button {
+           font-size: 18px;
          }
          span[role="textbox"] {
            font-size: 1rem;
@@ -79,10 +83,16 @@
     </fieldset>
 
     <script type="module">
-      const result = document.querySelector("#result");
+      const result = document.querySelector("#parse-result");
+      const deriveResult = document.querySelector("#derive-result");
       const queryInput = document.querySelector("#query");
 
       result.addEventListener("htmx:afterSwap", () => {
+        Prism.highlightAll();
+      });
+
+      deriveResult.addEventListener("htmx:afterSwap", () => {
+        deriveResult.innerHTML = "  " + deriveResult.innerHTML;
         Prism.highlightAll();
       });
 
@@ -119,7 +129,7 @@
         hx-get="/parse"
         hx-trigger="input[key == 'Enter' || document.querySelector('#auto').checked]"
         hx-vals="js: query:normalize(htmx.find('#query').innerText)"
-        hx-target="#result"
+        hx-target="#parse-result"
         placeholder="Parse..."
       ></span>
       <label>
@@ -127,7 +137,18 @@
         reload on change
       </label>
       <div style="margin: 1rem 0">
-        <pre><code id="result" class="language-js rainbow-braces match-braces"></code></pre>
+        <span>Parse:</span>
+        <pre><code id="parse-result" class="language-js rainbow-braces match-braces"></code></pre>
+        <button
+          id="derive-query"
+          hx-get="/derive"
+          hx-vals="js: query:normalize(htmx.find('#query').innerText)"
+          hx-target="#derive-result"
+        >
+          Derive
+        </button>
+        <span>(If nothing happens, the derivation failed.)</span>
+        <pre><code id="derive-result" class="language-js rainbow-braces match-braces"></code></pre>
       </div>
     </div>
   </body>

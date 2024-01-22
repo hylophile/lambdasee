@@ -197,7 +197,7 @@ pub fn stringify(e: Expr) -> String {
                 // .join(",\n");
                 .join(", ");
             if context == "" {
-                context = "Γ".to_string();
+                context = "∅".to_string();
             }
             format!(
                 // "{} \n\n⊢ {} \n\n: {}",

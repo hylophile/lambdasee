@@ -1,9 +1,9 @@
-use std::fmt::format;
+use std::fmt::{self, format};
 
 use crate::parser::{self, Expr};
 
 #[derive(PartialEq, Debug, Clone)]
-enum DRule {
+enum Rule {
     Sort,
     Var,
     Weak,
@@ -13,16 +13,24 @@ enum DRule {
     Conv,
 }
 
-#[derive(PartialEq, Debug, Clone)]
-struct DStep {
-    conclusion: Expr,
-    rule: DRule,
-    premiss_one: Option<Box<DStep>>,
-    premiss_two: Option<Box<DStep>>,
+impl fmt::Display for Rule {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // Use `self.number` to refer to each positional data point.
+        // write!(f, "({}, {})", self.0, self.1)
+        let s = match self {
+            Rule::Var => " (var)".to_string(),
+            _ => format!("{:?}", self).to_lowercase(),
+        };
+        write!(f, "{}", s)
+    }
 }
 
-pub fn derive(e: Expr) {
-    todo!()
+#[derive(PartialEq, Debug, Clone)]
+struct Derivation {
+    conclusion: Expr,
+    rule: Rule,
+    premiss_one: Option<Box<Derivation>>,
+    premiss_two: Option<Box<Derivation>>,
 }
 
 fn append_to_context(ident: Expr, etype: Expr, context: Vec<Expr>) -> Vec<Expr> {
@@ -84,7 +92,7 @@ fn test_all_except_last() {
     assert_eq!(all_except_last(x), vec![]);
 }
 
-fn step(judgement: Expr) -> DStep {
+fn derive(judgement: Expr) -> Derivation {
     match judgement {
         Expr::Judgement {
             context,
@@ -96,8 +104,8 @@ fn step(judgement: Expr) -> DStep {
             let judgement_type = *etype;
 
             if let ([], Expr::Star, Expr::Box) = (context, &judgement_expr, &judgement_type) {
-                return DStep {
-                    rule: DRule::Sort,
+                return Derivation {
+                    rule: Rule::Sort,
                     conclusion: Expr::Judgement {
                         context: context.to_vec(),
                         expr: Box::new(judgement_expr),
@@ -133,14 +141,14 @@ fn step(judgement: Expr) -> DStep {
                         // };
 
                         // TODO x \not\in\ context
-                        return DStep {
-                            rule: DRule::Var,
+                        return Derivation {
+                            rule: Rule::Var,
                             conclusion: Expr::Judgement {
                                 context: context.to_vec(),
                                 expr: Box::new(judgement_expr),
                                 etype: Box::new(judgement_type),
                             },
-                            premiss_one: Some(Box::new(step(Expr::Judgement {
+                            premiss_one: Some(Box::new(derive(Expr::Judgement {
                                 context: new_context,
                                 expr: Box::new(last_fv_type.clone()),
                                 etype: Box::new(determine_sort(last_fv_type, context.to_vec())),
@@ -157,20 +165,20 @@ fn step(judgement: Expr) -> DStep {
                                 etype: Box::new(judgement_type.clone()),
                             };
 
-                            let premiss_one = Some(Box::new(step(Expr::Judgement {
+                            let premiss_one = Some(Box::new(derive(Expr::Judgement {
                                 context: new_context.clone(),
                                 expr: Box::new(judgement_expr),
                                 etype: Box::new(judgement_type),
                             })));
 
-                            let premiss_two = Some(Box::new(step(Expr::Judgement {
+                            let premiss_two = Some(Box::new(derive(Expr::Judgement {
                                 context: new_context,
                                 expr: Box::new(last_fv_type.clone()),
                                 etype: Box::new(determine_sort(last_fv_type, context.to_vec())),
                             })));
 
-                            return DStep {
-                                rule: DRule::Weak,
+                            return Derivation {
+                                rule: Rule::Weak,
                                 conclusion,
                                 premiss_one,
                                 premiss_two,
@@ -195,7 +203,7 @@ fn step(judgement: Expr) -> DStep {
                     panic!("pi type is {:?}", judgement_type);
                 }
 
-                let premiss_one = Some(Box::new(step(Expr::Judgement {
+                let premiss_one = Some(Box::new(derive(Expr::Judgement {
                     context: context.to_vec(),
                     expr: pi_type.clone(),
                     etype: Box::new(determine_sort(*pi_type.clone(), context.to_vec())),
@@ -206,14 +214,14 @@ fn step(judgement: Expr) -> DStep {
                     None => Expr::Identifier("_".to_string()), // TODO search free variables, pick a new one?
                 };
 
-                let premiss_two = Some(Box::new(step(Expr::Judgement {
+                let premiss_two = Some(Box::new(derive(Expr::Judgement {
                     context: append_to_context(pi_ident, *pi_type.clone(), context.to_vec()),
                     expr: pi_body,
                     etype: Box::new(judgement_type.clone()),
                 })));
 
-                return DStep {
-                    rule: DRule::Form,
+                return Derivation {
+                    rule: Rule::Form,
                     conclusion: Expr::Judgement {
                         context: context.to_vec(),
                         expr: Box::new(judgement_expr),
@@ -236,33 +244,35 @@ fn step(judgement: Expr) -> DStep {
 #[test]
 fn sort() {
     let e = parser::parse_judgement("C |- * : #").unwrap();
-    assert_eq!("[0] Γ ⊢ ∗ : □        (Sort)", stringify(step(e)));
+    assert_eq!("[0] Γ ⊢ ∗ : □        (Sort)", stringify(derive(e)));
 }
 
 #[test]
 fn var() {
     let e = parser::parse_judgement("C, A: *, x: A |- x : A").unwrap();
-    let r = stringify(step(e));
+
+    let r = stringify(derive(e));
     println!("{r}");
     assert_eq!(r, "[0] A : ∗, x : A ⊢ x : A     (Var) on [1]\n[1] A : ∗ ⊢ A : ∗            (Var) on [2]\n[2] Γ ⊢ ∗ : □                (Sort)\n\n");
 
     // let e = parser::parse_judgement("C, x: A -> B -> C |- x : A -> B -> C").unwrap();
-    // assert_eq!(stringify(step(e)), "");
 }
 
 #[test]
 fn form() {
     let e = parser::parse_judgement("a: *, b:* |- a -> b : *").unwrap();
-    let r = stringify(step(e));
+    let e = parser::parse_judgement("{} |- /a: * . a : *").unwrap();
+    let e = parser::parse_judgement("{} |- (/a: * . a) -> (/b:*.b) : *").unwrap();
+    let r = stringify(derive(e));
     println!("{r}");
     assert_eq!(r, "[0] A : ∗, x : A ⊢ x : A     (Var) on [1]\n[1] A : ∗ ⊢ A : ∗            (Var) on [2]\n[2] Γ ⊢ ∗ : □                (Sort)\n\n");
 }
 
-fn stringify(derivation: DStep) -> String {
+fn stringify(derivation: Derivation) -> String {
     stringify_h(derivation, 0, 0).1
 }
 
-fn stringify_h(derivation: DStep, counter: u32, width: usize) -> (u32, String) {
+fn stringify_h(derivation: Derivation, counter: u32, width: usize) -> (u32, String) {
     let conclusion = parser::stringify(derivation.conclusion.clone());
     let counter = counter + 1;
 
@@ -289,19 +299,20 @@ fn stringify_h(derivation: DStep, counter: u32, width: usize) -> (u32, String) {
                 _ => unreachable!(),
             };
             let rule = match derivation.rule {
-                DRule::Form => {
+                Rule::Form => {
                     format!(
-                        "Form ({}, {})",
+                        "{} ({}, {})",
+                        Rule::Form,
                         parser::stringify(s1),
                         parser::stringify(s2)
                     )
                 }
-                rule => format!("{:?}", rule),
+                rule => format!("{}", rule),
             };
             (
                 p2_counter,
                 format!(
-                    "{:>5} {:width$} ({}) on [{}] and [{}]\n{}\n{}",
+                    "{:>5} {:width$} ({}) on [{}] and [{}]\n{}\n{}\n",
                     format!("[{counter}]"),
                     conclusion,
                     rule,
@@ -317,7 +328,7 @@ fn stringify_h(derivation: DStep, counter: u32, width: usize) -> (u32, String) {
             (
                 p1_counter,
                 format!(
-                    "{:>5} {:width$} ({:?}) on [{}]\n{}",
+                    "{:>5} {:width$} {} on [{}]\n{}\n",
                     format!("[{counter}]"),
                     conclusion,
                     derivation.rule,
@@ -330,11 +341,18 @@ fn stringify_h(derivation: DStep, counter: u32, width: usize) -> (u32, String) {
             counter,
             // "".to_string(),
             format!(
-                "{:>5} {:width$} ({:?})\n",
+                "{:>5} {:width$} ({})",
                 format!("[{counter}]"),
                 conclusion,
                 derivation.rule,
             ),
         ),
+    }
+}
+
+pub fn derivation(s: &str) -> String {
+    match parser::parse_judgement(s) {
+        Ok(j) => stringify(derive(j)),
+        Err(e) => format!("{}", e),
     }
 }
