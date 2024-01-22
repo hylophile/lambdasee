@@ -252,52 +252,62 @@ fn var() {
 
 #[test]
 fn form() {
-    let e = parser::parse_judgement("a: *, b:* |- a -> b : *").unwrap();
+    let e = parser::parse_judgement("a: *, c:*, b:* |- a -> b -> c : *").unwrap();
     let r = stringify(step(e));
     println!("{r}");
     assert_eq!(r, "[0] A : ∗, x : A ⊢ x : A     (Var) on [1]\n[1] A : ∗ ⊢ A : ∗            (Var) on [2]\n[2] Γ ⊢ ∗ : □                (Sort)\n\n");
 }
 
 fn stringify(derivation: DStep) -> String {
-    stringify_h(derivation, 0, 0)
+    stringify_h(derivation, 0, 0).1
 }
 
-fn stringify_h(derivation: DStep, counter: u32, width: usize) -> String {
+fn stringify_h(derivation: DStep, counter: u32, width: usize) -> (u32, String) {
     let conclusion = parser::stringify(derivation.conclusion);
+    let counter = counter + 1;
 
     let width = width.max(conclusion.len());
     // println!("{} {}", width, conclusion.len());
     match (derivation.premiss_one, derivation.premiss_two) {
         (Some(p1), Some(p2)) => {
-            let p1s = stringify_h(*p1, counter + 1, width);
-            let p2s = stringify_h(*p2, counter + 2, width);
-            format!(
-                "[{}] {:width$} ({:?}) on [{}] and [{}]\n{}\n{}\n",
-                counter,
-                conclusion,
-                derivation.rule,
-                counter + 1,
-                counter + 2,
-                p1s,
-                p2s,
+            let (p1_counter, p1s) = stringify_h(*p1, counter, width);
+            let (p2_counter, p2s) = stringify_h(*p2, p1_counter, width);
+            (
+                p2_counter,
+                format!(
+                    "{:>5} {:width$} ({:?}) on [{}] and [{}]\n{}\n{}",
+                    format!("[{counter}]"),
+                    conclusion,
+                    derivation.rule,
+                    counter + 1,
+                    p1_counter + 1,
+                    p1s,
+                    p2s,
+                ),
             )
         }
         (Some(p1), None) => {
-            let p1s = stringify_h(*p1, counter + 1, width);
-            format!(
-                "[{}] {:width$} ({:?}) on [{}]\n{}\n",
-                counter,
-                conclusion,
-                derivation.rule,
-                counter + 1,
-                p1s,
+            let (p1_counter, p1s) = stringify_h(*p1, counter, width);
+            (
+                p1_counter,
+                format!(
+                    "{:>5} {:width$} ({:?}) on [{}]\n{}",
+                    format!("[{counter}]"),
+                    conclusion,
+                    derivation.rule,
+                    counter + 1,
+                    p1s,
+                ),
             )
         }
-        _ => {
-            format!(
-                "[{}] {:width$} ({:?})",
-                counter, conclusion, derivation.rule,
-            )
-        }
+        _ => (
+            counter,
+            "".to_string(), // format!(
+                            //     "{:>5} {:width$} ({:?})\n",
+                            //     format!("[{counter}]"),
+                            //     conclusion,
+                            //     derivation.rule,
+                            // ),
+        ),
     }
 }
