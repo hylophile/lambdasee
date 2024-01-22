@@ -10,15 +10,15 @@ fn parse(query: &str) -> String {
     // deriver::derivation(query)
     match parser::parse_judgement(query) {
         Ok(s) => {
-            format!("{}", parser::stringify(s))
+            format!("<code>{}</code>", parser::stringify(s))
         }
-        Err(e) => format!("{}", e),
+        Err(e) => format!("<code>{}</code>", e),
     }
 }
 
 #[get("/derive?<query>")]
 fn derive(query: &str) -> String {
-    format!("\n{}", deriver::derivation(query))
+    format!("<code>{}</code>", deriver::derivation(query))
 }
 
 #[launch]
