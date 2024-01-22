@@ -1,4 +1,5 @@
 use std::fmt::{self, format};
+use thiserror::Error;
 
 use crate::parser::{self, Expr};
 
@@ -31,6 +32,14 @@ struct Derivation {
     rule: Rule,
     premiss_one: Option<Box<Derivation>>,
     premiss_two: Option<Box<Derivation>>,
+}
+
+#[derive(Debug, Error)]
+enum DeriveError {
+    #[error("Derivation unimplemented for judgement: {0}")]
+    Unimplemented(String),
+    #[error(r#"Unexpected Pi type "{0}" in judgement "{1}""#)]
+    UnexpectedPiType(String, String),
 }
 
 fn append_to_context(ident: Expr, etype: Expr, context: Vec<Expr>) -> Vec<Expr> {
@@ -92,8 +101,8 @@ fn test_all_except_last() {
     assert_eq!(all_except_last(x), vec![]);
 }
 
-fn derive(judgement: Expr) -> Derivation {
-    match judgement {
+fn derive(judgement: Expr) -> Result<Derivation, DeriveError> {
+    match judgement.clone() {
         Expr::Judgement {
             context,
             expr,
@@ -104,7 +113,7 @@ fn derive(judgement: Expr) -> Derivation {
             let judgement_type = *etype;
 
             if let ([], Expr::Star, Expr::Box) = (context, &judgement_expr, &judgement_type) {
-                return Derivation {
+                return Ok(Derivation {
                     rule: Rule::Sort,
                     conclusion: Expr::Judgement {
                         context: context.to_vec(),
@@ -113,7 +122,7 @@ fn derive(judgement: Expr) -> Derivation {
                     },
                     premiss_one: None,
                     premiss_two: None,
-                };
+                });
             }
 
             match context.last() {
@@ -141,7 +150,7 @@ fn derive(judgement: Expr) -> Derivation {
                         // };
 
                         // TODO x \not\in\ context
-                        return Derivation {
+                        return Ok(Derivation {
                             rule: Rule::Var,
                             conclusion: Expr::Judgement {
                                 context: context.to_vec(),
@@ -152,9 +161,9 @@ fn derive(judgement: Expr) -> Derivation {
                                 context: new_context,
                                 expr: Box::new(last_fv_type.clone()),
                                 etype: Box::new(determine_sort(last_fv_type, context.to_vec())),
-                            }))),
+                            })?)),
                             premiss_two: None,
-                        };
+                        });
                     }
 
                     match judgement_expr {
@@ -169,20 +178,20 @@ fn derive(judgement: Expr) -> Derivation {
                                 context: new_context.clone(),
                                 expr: Box::new(judgement_expr),
                                 etype: Box::new(judgement_type),
-                            })));
+                            })?));
 
                             let premiss_two = Some(Box::new(derive(Expr::Judgement {
                                 context: new_context,
                                 expr: Box::new(last_fv_type.clone()),
                                 etype: Box::new(determine_sort(last_fv_type, context.to_vec())),
-                            })));
+                            })?));
 
-                            return Derivation {
+                            return Ok(Derivation {
                                 rule: Rule::Weak,
                                 conclusion,
                                 premiss_one,
                                 premiss_two,
-                            };
+                            });
                         }
                         _ => (),
                     }
@@ -207,7 +216,7 @@ fn derive(judgement: Expr) -> Derivation {
                     context: context.to_vec(),
                     expr: pi_type.clone(),
                     etype: Box::new(determine_sort(*pi_type.clone(), context.to_vec())),
-                })));
+                })?));
 
                 let pi_ident = match pi_ident {
                     Some(i) => *i,
@@ -218,9 +227,9 @@ fn derive(judgement: Expr) -> Derivation {
                     context: append_to_context(pi_ident, *pi_type.clone(), context.to_vec()),
                     expr: pi_body,
                     etype: Box::new(judgement_type.clone()),
-                })));
+                })?));
 
-                return Derivation {
+                return Ok(Derivation {
                     rule: Rule::Form,
                     conclusion: Expr::Judgement {
                         context: context.to_vec(),
@@ -229,29 +238,29 @@ fn derive(judgement: Expr) -> Derivation {
                     },
                     premiss_one,
                     premiss_two,
-                };
+                });
             }
-
-            panic!(
-                "ctx:  {:?}\nexpr: {:?}\ntype: {:?}",
-                context, judgement_expr, judgement_type
-            )
+            Err(DeriveError::Unimplemented(parser::stringify(judgement)))
+            // panic!(
+            //     "ctx:  {:?}\nexpr: {:?}\ntype: {:?}",
+            //     context, judgement_expr, judgement_type
+            // )
         }
-        _ => panic!("b"),
+        _ => unreachable!(),
     }
 }
 
 #[test]
 fn sort() {
     let e = parser::parse_judgement("C |- * : #").unwrap();
-    assert_eq!("[0] Γ ⊢ ∗ : □        (Sort)", stringify(derive(e)));
+    assert_eq!("[0] Γ ⊢ ∗ : □        (Sort)", stringify(derive(e).unwrap()));
 }
 
 #[test]
 fn var() {
     let e = parser::parse_judgement("C, A: *, x: A |- x : A").unwrap();
 
-    let r = stringify(derive(e));
+    let r = stringify(derive(e).unwrap());
     println!("{r}");
     assert_eq!(r, "[0] A : ∗, x : A ⊢ x : A     (Var) on [1]\n[1] A : ∗ ⊢ A : ∗            (Var) on [2]\n[2] Γ ⊢ ∗ : □                (Sort)\n\n");
 
@@ -263,9 +272,15 @@ fn form() {
     let e = parser::parse_judgement("a: *, b:* |- a -> b : *").unwrap();
     let e = parser::parse_judgement("{} |- /a: * . a : *").unwrap();
     let e = parser::parse_judgement("{} |- (/a: * . a) -> (/b:*.b) : *").unwrap();
-    let r = stringify(derive(e));
+    let r = stringify(derive(e).unwrap());
     println!("{r}");
     assert_eq!(r, "[0] A : ∗, x : A ⊢ x : A     (Var) on [1]\n[1] A : ∗ ⊢ A : ∗            (Var) on [2]\n[2] Γ ⊢ ∗ : □                (Sort)\n\n");
+}
+
+#[test]
+fn moo() {
+    let x = derivation("{} |- \\a:*. a : *");
+    assert_eq!("", x);
 }
 
 fn stringify(derivation: Derivation) -> String {
@@ -352,7 +367,10 @@ fn stringify_h(derivation: Derivation, counter: u32, width: usize) -> (u32, Stri
 
 pub fn derivation(s: &str) -> String {
     match parser::parse_judgement(s) {
-        Ok(j) => stringify(derive(j)),
+        Ok(j) => match derive(j) {
+            Ok(d) => stringify(d),
+            Err(e) => format!("{}", e),
+        },
         Err(e) => format!("{}", e),
     }
 }

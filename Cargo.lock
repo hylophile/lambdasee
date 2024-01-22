@@ -530,6 +530,7 @@ dependencies = [
  "pest",
  "pest_derive",
  "rocket",
+ "thiserror",
 ]
 
 [[package]]
