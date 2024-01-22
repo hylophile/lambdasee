@@ -8,30 +8,76 @@
     <script src="prism.js"></script>
     <link rel="stylesheet" href="prism.css" />
     <style>
-      html {
-        font-size: 18px;
-        font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
-      }
-      body {
-        margin: 10rem;
-      }
-      label,
-      input {
-        font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
-      }
-      span[role="textbox"] {
-        font-size: 1rem;
-        border: 1px solid slategray;
-        margin 1em 0;
-        padding: 0.5em;
-      }
-      .flex {
-        display: flex;
-        flex-direction: column;
+         html {
+           font-size: 18px;
+           font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
+           color: #16191c;
+         }
+         body {
+           margin: 10rem;
+         }
+         label,
+         input {
+           font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
+         }
+         span[role="textbox"] {
+           font-size: 1rem;
+           border: 1px solid slategray;
+           margin 1em 0;
+           padding: 0.5em;
+         }
+         .flex {
+           display: flex;
+           flex-direction: column;
+         }
+        .float {
+          position: fixed;
+          right: 1em;
+          top: 1em;
+          border: 1px solid slategray;
+        }
+        .grid-container {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .grid-item {
+          text-align: center;
       }
     </style>
   </head>
   <body>
+    <fieldset class="float">
+      <legend style="font-size: 16px">UTF-8 ⟷ ASCII</legend>
+      <div class="grid-container">
+        <div class="grid-item">λ</div>
+        <div class="grid-item">\</div>
+
+        <div class="grid-item">Π</div>
+        <div class="grid-item">/</div>
+
+        <div class="grid-item">→</div>
+        <div class="grid-item">-></div>
+
+        <div class="grid-item">∗</div>
+        <div class="grid-item">*</div>
+
+        <div class="grid-item">□</div>
+        <div class="grid-item">#</div>
+
+        <div class="grid-item">Γ</div>
+        <div class="grid-item">C</div>
+
+        <div class="grid-item">⊢</div>
+        <div class="grid-item">|-</div>
+
+        <div class="grid-item">∅</div>
+        <div class="grid-item">{}</div>
+
+        <div class="grid-item">⊥</div>
+        <div class="grid-item">_|_</div>
+      </div>
+    </fieldset>
+
     <script type="module">
       const result = document.querySelector("#result");
       const queryInput = document.querySelector("#query");
