@@ -2,7 +2,7 @@ use std::fmt::format;
 
 use crate::parser::{self, Expr};
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 enum DRule {
     Sort,
     Var,
@@ -13,7 +13,7 @@ enum DRule {
     Conv,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 struct DStep {
     conclusion: Expr,
     rule: DRule,
@@ -252,7 +252,7 @@ fn var() {
 
 #[test]
 fn form() {
-    let e = parser::parse_judgement("a: *, c:*, b:* |- a -> b -> c : *").unwrap();
+    let e = parser::parse_judgement("a: *, b:* |- a -> b : *").unwrap();
     let r = stringify(step(e));
     println!("{r}");
     assert_eq!(r, "[0] A : ∗, x : A ⊢ x : A     (Var) on [1]\n[1] A : ∗ ⊢ A : ∗            (Var) on [2]\n[2] Γ ⊢ ∗ : □                (Sort)\n\n");
@@ -263,22 +263,48 @@ fn stringify(derivation: DStep) -> String {
 }
 
 fn stringify_h(derivation: DStep, counter: u32, width: usize) -> (u32, String) {
-    let conclusion = parser::stringify(derivation.conclusion);
+    let conclusion = parser::stringify(derivation.conclusion.clone());
     let counter = counter + 1;
 
     let width = width.max(conclusion.len());
     // println!("{} {}", width, conclusion.len());
     match (derivation.premiss_one, derivation.premiss_two) {
         (Some(p1), Some(p2)) => {
-            let (p1_counter, p1s) = stringify_h(*p1, counter, width);
+            let (p1_counter, p1s) = stringify_h(*(p1.clone()), counter, width);
             let (p2_counter, p2s) = stringify_h(*p2, p1_counter, width);
+            let s2 = match derivation.conclusion {
+                Expr::Judgement {
+                    context: _,
+                    expr: _,
+                    etype,
+                } => *etype,
+                _ => unreachable!(),
+            };
+            let s1 = match p1.conclusion {
+                Expr::Judgement {
+                    context: _,
+                    expr: _,
+                    etype,
+                } => *etype,
+                _ => unreachable!(),
+            };
+            let rule = match derivation.rule {
+                DRule::Form => {
+                    format!(
+                        "Form ({}, {})",
+                        parser::stringify(s1),
+                        parser::stringify(s2)
+                    )
+                }
+                rule => format!("{:?}", rule),
+            };
             (
                 p2_counter,
                 format!(
-                    "{:>5} {:width$} ({:?}) on [{}] and [{}]\n{}\n{}",
+                    "{:>5} {:width$} ({}) on [{}] and [{}]\n{}\n{}",
                     format!("[{counter}]"),
                     conclusion,
-                    derivation.rule,
+                    rule,
                     counter + 1,
                     p1_counter + 1,
                     p1s,
@@ -302,12 +328,13 @@ fn stringify_h(derivation: DStep, counter: u32, width: usize) -> (u32, String) {
         }
         _ => (
             counter,
-            "".to_string(), // format!(
-                            //     "{:>5} {:width$} ({:?})\n",
-                            //     format!("[{counter}]"),
-                            //     conclusion,
-                            //     derivation.rule,
-                            // ),
+            // "".to_string(),
+            format!(
+                "{:>5} {:width$} ({:?})\n",
+                format!("[{counter}]"),
+                conclusion,
+                derivation.rule,
+            ),
         ),
     }
 }
