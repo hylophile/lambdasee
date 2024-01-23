@@ -21,7 +21,7 @@ lazy_static::lazy_static! {
     };
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Hash, Eq)]
 pub enum Expr {
     Identifier(String),
     Star,

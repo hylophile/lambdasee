@@ -1,9 +1,12 @@
-use std::fmt::{self, format};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::{self, format},
+};
 use thiserror::Error;
 
 use crate::parser::{self, Expr};
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
 enum Rule {
     Sort,
     Var,
@@ -25,6 +28,8 @@ impl fmt::Display for Rule {
         write!(f, "{}", s)
     }
 }
+
+// type DerivationCache = HashMap<>
 
 #[derive(PartialEq, Debug, Clone)]
 struct Derivation {
@@ -363,6 +368,63 @@ fn stringify_h(derivation: Derivation, counter: u32, width: usize) -> (u32, Stri
             ),
         ),
     }
+}
+
+type DerivationCache = HashMap<Expr, (i32, Option<RuleRef>)>;
+
+fn deduplicate(d: Derivation) {
+    let mut cache: DerivationCache = HashMap::new();
+
+    deduplicate_h(d, &mut cache, &mut 0);
+
+    let mut s = cache.drain().collect::<Vec<_>>();
+    s.sort_unstable_by(|(_, v1), (_, v2)| v1.0.cmp(&v2.0));
+    for (k, v) in s {
+        println!("{} {:?}", parser::stringify(k), v);
+    }
+
+    println!("{:?}", cache);
+    println!("{:?}", cache.values());
+}
+#[test]
+fn dedup() {
+    let e = parser::parse_judgement("a: *, b:*,c:*,d:* |- a -> b -> c->d : *").unwrap();
+    let d = derive(e).unwrap();
+    deduplicate(d);
+    panic!();
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+enum RuleRef {
+    One(Rule, i32),
+    Two(Rule, i32, i32),
+}
+
+fn deduplicate_h(d: Derivation, c: &mut DerivationCache, id: &mut i32) -> i32 {
+    c.entry(d.conclusion.clone()).or_insert_with(|| {
+        let x = *id;
+        *id = *id + 1;
+        (x, None)
+    });
+
+    let rule_ref = match (d.premiss_one, d.premiss_two) {
+        (Some(p1), Some(p2)) => {
+            let p1_id = deduplicate_h(*p1, c, id);
+            let p2_id = deduplicate_h(*p2, c, id);
+            Some(RuleRef::Two(d.rule, p1_id, p2_id))
+        }
+        (Some(p1), None) => {
+            let p1_id = deduplicate_h(*p1, c, id);
+            Some(RuleRef::One(d.rule, p1_id))
+        }
+        _ => None,
+    };
+
+    if let Some(k) = c.get_mut(&d.conclusion) {
+        k.1 = rule_ref;
+        return k.0;
+    }
+    unreachable!()
 }
 
 pub fn derivation(s: &str) -> String {
