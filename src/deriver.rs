@@ -11,7 +11,7 @@ enum Rule {
     Sort,
     Var,
     Weak,
-    Form,
+    Form(Expr, Expr),
     Appl,
     Abst,
     Conv,
@@ -22,8 +22,13 @@ impl fmt::Display for Rule {
         // Use `self.number` to refer to each positional data point.
         // write!(f, "({}, {})", self.0, self.1)
         let s = match self {
-            Rule::Var => " (var)".to_string(),
-            _ => format!("{:?}", self).to_lowercase(),
+            // Rule::Var => " (var)".to_string(),
+            Rule::Form(s1, s2) => format!(
+                "(form ({},{}))",
+                parser::stringify(s1.clone()),
+                parser::stringify(s2.clone())
+            ),
+            _ => format!("({:?})", self).to_lowercase(),
         };
         write!(f, "{}", s)
     }
@@ -217,10 +222,11 @@ fn derive(judgement: Expr) -> Result<Derivation, DeriveError> {
                     panic!("pi type is {:?}", judgement_type);
                 }
 
+                let p1_type = determine_sort(*pi_type.clone(), context.to_vec());
                 let premiss_one = Some(Box::new(derive(Expr::Judgement {
                     context: context.to_vec(),
                     expr: pi_type.clone(),
-                    etype: Box::new(determine_sort(*pi_type.clone(), context.to_vec())),
+                    etype: Box::new(p1_type.clone()),
                 })?));
 
                 let pi_ident = match pi_ident {
@@ -233,9 +239,11 @@ fn derive(judgement: Expr) -> Result<Derivation, DeriveError> {
                     expr: pi_body,
                     etype: Box::new(judgement_type.clone()),
                 })?));
+                let s2 = judgement_type.clone();
+                let s1 = p1_type;
 
                 return Ok(Derivation {
-                    rule: Rule::Form,
+                    rule: Rule::Form(s1, s2),
                     conclusion: Expr::Judgement {
                         context: context.to_vec(),
                         expr: Box::new(judgement_expr),
@@ -302,30 +310,9 @@ fn stringify_h(derivation: Derivation, counter: u32, width: usize) -> (u32, Stri
         (Some(p1), Some(p2)) => {
             let (p1_counter, p1s) = stringify_h(*(p1.clone()), counter, width);
             let (p2_counter, p2s) = stringify_h(*p2, p1_counter, width);
-            let s2 = match derivation.conclusion {
-                Expr::Judgement {
-                    context: _,
-                    expr: _,
-                    etype,
-                } => *etype,
-                _ => unreachable!(),
-            };
-            let s1 = match p1.conclusion {
-                Expr::Judgement {
-                    context: _,
-                    expr: _,
-                    etype,
-                } => *etype,
-                _ => unreachable!(),
-            };
             let rule = match derivation.rule {
-                Rule::Form => {
-                    format!(
-                        "{} ({}, {})",
-                        Rule::Form,
-                        parser::stringify(s1),
-                        parser::stringify(s2)
-                    )
+                Rule::Form(_, _) => {
+                    format!("{}", derivation.rule)
                 }
                 rule => format!("{}", rule),
             };
@@ -398,8 +385,20 @@ fn dedup() {
     panic!();
 }
 
+impl fmt::Display for RuleRef {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let s = match self {
+            RuleRef::None(r) => format!("{}", r),
+            RuleRef::One(r, p1) => format!("{} on [{}]", r, p1),
+            RuleRef::Two(r, p1, p2) => format!("{} on [{}] and [{}]", r, p1, p2),
+        };
+        write!(f, "{}", s)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Hash)]
 enum RuleRef {
+    None(Rule),
     One(Rule, i32),
     Two(Rule, i32, i32),
 }
@@ -421,7 +420,7 @@ fn deduplicate_h(d: Derivation, c: &mut DerivationCache, id: &mut i32) -> i32 {
             let p1_id = deduplicate_h(*p1, c, id);
             Some(RuleRef::One(d.rule, p1_id))
         }
-        _ => None,
+        _ => Some(RuleRef::None(d.rule)),
     };
 
     if let Some(k) = c.get_mut(&d.conclusion) {
@@ -446,17 +445,18 @@ pub fn derivation_html(s: &str) -> String {
         Ok(j) => match derive(j) {
             Ok(d) => deduplicate(d)
                 .iter()
-                .map(|(k, v)| {
+                .map(|(k, (id, rule))| {
                     format!(
-                        r#"{} <code class="rule">{:?}</code>"#,
+                        r#"<span class="id">[{}]</span> {} <span class="rule">{}</span>"#,
+                        id,
                         parser::htmlify(k.clone()),
-                        v
+                        rule.as_ref().expect("unreachable")
                     )
                 })
                 .collect::<Vec<_>>()
                 .join("\n"),
-            Err(e) => format!("{}", e),
+            Err(e) => format!("<code>{}</code>", e),
         },
-        Err(e) => format!("{}", e),
+        Err(e) => format!("<code>{}</code>", e),
     }
 }
