@@ -8,56 +8,60 @@
     <script src="prism.js"></script>
     <link rel="stylesheet" href="prism.css" />
     <style>
-        #derive-result {
-          display: grid;
-          grid-template-columns: max-content 3em max-content 3em max-content max-content;
-         }
-       .rule {
-         text-align: left;
-         margin-left: 1em;
-       }
-      .expr, .turnstile, .type-symbol {
-        text-align: center !important;
+         #derive-result {
+           display: grid;
+           grid-template-columns: max-content max-content 3em max-content 3em max-content max-content;
+          }
+        .rule {
+          text-align: left;
+          margin-left: 1em;
+        }
+      .id {
+        text-align: right !important;
+        margin-right: 1em;
       }
-            html {
-              font-size: 18px;
-              font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
-              color: #16191c;
-            }
-            body {
-              margin: 10rem;
-            }
-            label,
-            input,
-            button {
-              font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
-            }
-            button {
-              font-size: 18px;
-            }
-            span[role="textbox"] {
-              font-size: 1rem;
+       .expr, .turnstile, .type-symbol {
+         text-align: center !important;
+       }
+             html {
+               font-size: 18px;
+               font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
+               color: #16191c;
+             }
+             body {
+               margin: 10rem;
+             }
+             label,
+             input,
+             button {
+               font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
+             }
+             button {
+               font-size: 18px;
+             }
+             span[role="textbox"] {
+               font-size: 1rem;
+               border: 1px solid slategray;
+               margin 1em 0;
+               padding: 0.5em;
+             }
+             .flex {
+               display: flex;
+               flex-direction: column;
+             }
+            .float {
+              position: fixed;
+              right: 1em;
+              top: 1em;
               border: 1px solid slategray;
-              margin 1em 0;
-              padding: 0.5em;
             }
-            .flex {
-              display: flex;
-              flex-direction: column;
+            .grid-container {
+              display: grid;
+              grid-template-columns: repeat(2, 1fr);
             }
-           .float {
-             position: fixed;
-             right: 1em;
-             top: 1em;
-             border: 1px solid slategray;
-           }
-           .grid-container {
-             display: grid;
-             grid-template-columns: repeat(2, 1fr);
-           }
-           .grid-item {
-             text-align: center;
-         }
+            .grid-item {
+              text-align: center;
+          }
     </style>
   </head>
   <body>
