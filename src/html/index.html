@@ -116,8 +116,9 @@
       });
 
       queryInput.addEventListener("input", () => {
-        window.location.hash =
-          "query=" + btoa(encodeURIComponent(queryInput.innerText));
+        window.location.replace(
+          "#query=" + btoa(encodeURIComponent(queryInput.innerText)),
+        );
       });
 
       window.addEventListener("load", () => {
