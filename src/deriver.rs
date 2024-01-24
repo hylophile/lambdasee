@@ -48,8 +48,8 @@ struct Derivation {
 enum DeriveError {
     #[error("Derivation unimplemented for judgement: {0}")]
     Unimplemented(String),
-    #[error(r#"Unexpected Pi type "{0}" in judgement "{1}""#)]
-    UnexpectedPiType(String, String),
+    #[error("Unexpected type {0} in judgement {1}.\nThe type of a Pi abstraction must be a sort (either ∗ or □).")]
+    UnexpectedPiAbstractionType(String, String),
 }
 
 fn append_to_context(ident: Expr, etype: Expr, context: Vec<Expr>) -> Vec<Expr> {
@@ -219,7 +219,10 @@ fn derive(judgement: Expr) -> Result<Derivation, DeriveError> {
             } = judgement_expr.clone()
             {
                 if judgement_type != Expr::Star && judgement_type != Expr::Box {
-                    panic!("pi type is {:?}", judgement_type);
+                    return Err(DeriveError::UnexpectedPiAbstractionType(
+                        parser::stringify(judgement_type),
+                        parser::stringify(judgement),
+                    ));
                 }
 
                 let p1_type = determine_sort(*pi_type.clone(), context.to_vec());
