@@ -210,6 +210,33 @@ pub fn stringify(e: Expr) -> String {
     }
 }
 
+pub fn htmlify(e: Expr) -> String {
+    match e {
+        Expr::Judgement {
+            context,
+            expr,
+            etype,
+        } => {
+            let mut context = context
+                .iter()
+                .map(|e| stringify((*e).clone()))
+                .collect::<Vec<_>>()
+                // .join(",\n");
+                .join(", ");
+            if context == "" {
+                context = "∅".to_string();
+            }
+            format!(
+                r#"<code class="context">{}</code><code class="turnstile"> ⊢ </code><code class="expr">{}</code><code class="type-symbol"> : </code><code class="type">{}</code>"#,
+                (context),
+                stringify(*expr),
+                stringify(*etype)
+            )
+        }
+        _ => stringify(e),
+    }
+}
+
 #[test]
 fn e() {
     let line = "a:b⊢a : (b)";

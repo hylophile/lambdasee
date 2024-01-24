@@ -8,45 +8,56 @@
     <script src="prism.js"></script>
     <link rel="stylesheet" href="prism.css" />
     <style>
-         html {
-           font-size: 18px;
-           font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
-           color: #16191c;
-         }
-         body {
-           margin: 10rem;
-         }
-         label,
-         input,
-         button {
-           font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
-         }
-         button {
-           font-size: 18px;
-         }
-         span[role="textbox"] {
-           font-size: 1rem;
-           border: 1px solid slategray;
-           margin 1em 0;
-           padding: 0.5em;
-         }
-         .flex {
-           display: flex;
-           flex-direction: column;
-         }
-        .float {
-          position: fixed;
-          right: 1em;
-          top: 1em;
-          border: 1px solid slategray;
-        }
-        .grid-container {
+        #derive-result {
           display: grid;
-          grid-template-columns: repeat(2, 1fr);
-        }
-        .grid-item {
-          text-align: center;
+          grid-template-columns: max-content 3em max-content 3em max-content max-content;
+         }
+       .rule {
+         text-align: left;
+         margin-left: 1em;
+       }
+      .expr, .turnstile, .type-symbol {
+        text-align: center !important;
       }
+            html {
+              font-size: 18px;
+              font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
+              color: #16191c;
+            }
+            body {
+              margin: 10rem;
+            }
+            label,
+            input,
+            button {
+              font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
+            }
+            button {
+              font-size: 18px;
+            }
+            span[role="textbox"] {
+              font-size: 1rem;
+              border: 1px solid slategray;
+              margin 1em 0;
+              padding: 0.5em;
+            }
+            .flex {
+              display: flex;
+              flex-direction: column;
+            }
+           .float {
+             position: fixed;
+             right: 1em;
+             top: 1em;
+             border: 1px solid slategray;
+           }
+           .grid-container {
+             display: grid;
+             grid-template-columns: repeat(2, 1fr);
+           }
+           .grid-item {
+             text-align: center;
+         }
     </style>
   </head>
   <body>
@@ -97,7 +108,6 @@
       });
 
       deriveResult.addEventListener("htmx:afterSwap", () => {
-        // deriveResult.innerHTML = "  " + deriveResult.innerHTML;
         Prism.highlightAll();
       });
 
@@ -118,29 +128,31 @@
 
       window.normalize = (s) => s.replaceAll("\u{a0}", " ");
 
-      let x =
-        "a : ∗, b : ∗, c : ∗, d : ∗ ⊢ (a → (b → (c → d))) : ∗ (0, Some(Two(Form, 1, 9)))\na : ∗, b : ∗, c : ∗, d : ∗ ⊢ a : ∗ (1, Some(Two(Weak, 2, 8)))\na : ∗, b : ∗, c : ∗ ⊢ a : ∗ (2, Some(Two(Weak, 3, 7)))\na : ∗, b : ∗ ⊢ a : ∗ (3, Some(Two(Weak, 4, 6)))\na : ∗ ⊢ a : ∗ (4, Some(One(Var, 5)))\n∅ ⊢ ∗ : □ (5, None)\na : ∗ ⊢ ∗ : □ (6, Some(Two(Weak, 5, 5)))\na : ∗, b : ∗ ⊢ ∗ : □ (7, Some(Two(Weak, 6, 6)))\na : ∗, b : ∗, c : ∗ ⊢ ∗ : □ (8, Some(Two(Weak, 7, 7)))\na : ∗, b : ∗, c : ∗, d : ∗, _ : a ⊢ (b → (c → d)) : ∗ (9, Some(Two(Form, 10, 14)))\na : ∗, b : ∗, c : ∗, d : ∗, _ : a ⊢ b : ∗ (10, Some(Two(Weak, 11, 1)))\na : ∗, b : ∗, c : ∗, d : ∗ ⊢ b : ∗ (11, Some(Two(Weak, 12, 8)))\na : ∗, b : ∗, c : ∗ ⊢ b : ∗ (12, Some(Two(Weak, 13, 7)))\na : ∗, b : ∗ ⊢ b : ∗ (13, Some(One(Var, 6)))\na : ∗, b : ∗, c : ∗, d : ∗, _ : a, _ : b ⊢ (c → d) : ∗ (14, Some(Two(Form, 15, 19)))\na : ∗, b : ∗, c : ∗, d : ∗, _ : a, _ : b ⊢ c : ∗ (15, Some(Two(Weak, 16, 10)))\na : ∗, b : ∗, c : ∗, d : ∗, _ : a ⊢ c : ∗ (16, Some(Two(Weak, 17, 1)))\na : ∗, b : ∗, c : ∗, d : ∗ ⊢ c : ∗ (17, Some(Two(Weak, 18, 8)))\na : ∗, b : ∗, c : ∗ ⊢ c : ∗ (18, Some(One(Var, 7)))\na : ∗, b : ∗, c : ∗, d : ∗, _ : a, _ : b, _ : c ⊢ d : ∗ (19, Some(Two(Weak, 20, 15)))\na : ∗, b : ∗, c : ∗, d : ∗, _ : a, _ : b ⊢ d : ∗ (20, Some(Two(Weak, 21, 10)))\na : ∗, b : ∗, c : ∗, d : ∗, _ : a ⊢ d : ∗ (21, Some(Two(Weak, 22, 1)))\na : ∗, b : ∗, c : ∗, d : ∗ ⊢ d : ∗ (22, Some(One(Var, 8)))";
+      const legacyFormat = () => {
+        let x =
+          "a : ∗, b : ∗, c : ∗, d : ∗ ⊢ (a → (b → (c → d))) : ∗ (0, Some(Two(Form, 1, 9)))\na : ∗, b : ∗, c : ∗, d : ∗ ⊢ a : ∗ (1, Some(Two(Weak, 2, 8)))\na : ∗, b : ∗, c : ∗ ⊢ a : ∗ (2, Some(Two(Weak, 3, 7)))\na : ∗, b : ∗ ⊢ a : ∗ (3, Some(Two(Weak, 4, 6)))\na : ∗ ⊢ a : ∗ (4, Some(One(Var, 5)))\n∅ ⊢ ∗ : □ (5, None)\na : ∗ ⊢ ∗ : □ (6, Some(Two(Weak, 5, 5)))\na : ∗, b : ∗ ⊢ ∗ : □ (7, Some(Two(Weak, 6, 6)))\na : ∗, b : ∗, c : ∗ ⊢ ∗ : □ (8, Some(Two(Weak, 7, 7)))\na : ∗, b : ∗, c : ∗, d : ∗, _ : a ⊢ (b → (c → d)) : ∗ (9, Some(Two(Form, 10, 14)))\na : ∗, b : ∗, c : ∗, d : ∗, _ : a ⊢ b : ∗ (10, Some(Two(Weak, 11, 1)))\na : ∗, b : ∗, c : ∗, d : ∗ ⊢ b : ∗ (11, Some(Two(Weak, 12, 8)))\na : ∗, b : ∗, c : ∗ ⊢ b : ∗ (12, Some(Two(Weak, 13, 7)))\na : ∗, b : ∗ ⊢ b : ∗ (13, Some(One(Var, 6)))\na : ∗, b : ∗, c : ∗, d : ∗, _ : a, _ : b ⊢ (c → d) : ∗ (14, Some(Two(Form, 15, 19)))\na : ∗, b : ∗, c : ∗, d : ∗, _ : a, _ : b ⊢ c : ∗ (15, Some(Two(Weak, 16, 10)))\na : ∗, b : ∗, c : ∗, d : ∗, _ : a ⊢ c : ∗ (16, Some(Two(Weak, 17, 1)))\na : ∗, b : ∗, c : ∗, d : ∗ ⊢ c : ∗ (17, Some(Two(Weak, 18, 8)))\na : ∗, b : ∗, c : ∗ ⊢ c : ∗ (18, Some(One(Var, 7)))\na : ∗, b : ∗, c : ∗, d : ∗, _ : a, _ : b, _ : c ⊢ d : ∗ (19, Some(Two(Weak, 20, 15)))\na : ∗, b : ∗, c : ∗, d : ∗, _ : a, _ : b ⊢ d : ∗ (20, Some(Two(Weak, 21, 10)))\na : ∗, b : ∗, c : ∗, d : ∗, _ : a ⊢ d : ∗ (21, Some(Two(Weak, 22, 1)))\na : ∗, b : ∗, c : ∗, d : ∗ ⊢ d : ∗ (22, Some(One(Var, 8)))";
 
-      const d = (s) => {
-        let [c, et] = s.split("⊢");
-        let lastIndex = et.lastIndexOf(":");
-        let e = et.substring(0, lastIndex);
-        let t = et.substring(lastIndex + 1);
-        return [c, e, t];
+        const d = (s) => {
+          let [c, et] = s.split("⊢");
+          let lastIndex = et.lastIndexOf(":");
+          let e = et.substring(0, lastIndex);
+          let t = et.substring(lastIndex + 1);
+          return [c, e, t];
+        };
+        let z = x.split("\n").map(d);
+
+        let cmax = Math.max(...z.map(([c, e, t]) => c.length));
+        let emax = Math.max(...z.map(([c, e, t]) => e.length));
+        let tmax = Math.max(...z.map(([c, e, t]) => t.length));
+
+        let q = z
+          .map(([c, e, t]) => {
+            return `${c.padEnd(cmax)}⊢${e.padEnd(emax)}:${t.padEnd(tmax)}`;
+          })
+          .join("\n");
+
+        deriveResult.innerHTML = q;
       };
-      let z = x.split("\n").map(d);
-
-      let cmax = Math.max(...z.map(([c, e, t]) => c.length));
-      let emax = Math.max(...z.map(([c, e, t]) => e.length));
-      let tmax = Math.max(...z.map(([c, e, t]) => t.length));
-
-      let q = z
-        .map(([c, e, t]) => {
-          return `${c.padEnd(cmax)}⊢${e.padEnd(emax)}:${t.padEnd(tmax)}`;
-        })
-        .join("\n");
-
-      deriveResult.innerHTML = q;
     </script>
     <div class="flex">
       <h1 style="margin: 0 auto">λ•</h1>
@@ -182,7 +194,9 @@
         <pre
           id="derive-result"
           class="language-lisp rainbow-braces match-braces"
-        ><code></code></pre>
+        >
+          <code></code>
+        </pre>
       </div>
     </div>
   </body>

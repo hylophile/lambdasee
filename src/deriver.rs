@@ -372,25 +372,29 @@ fn stringify_h(derivation: Derivation, counter: u32, width: usize) -> (u32, Stri
 
 type DerivationCache = HashMap<Expr, (i32, Option<RuleRef>)>;
 
-fn deduplicate(d: Derivation) {
+fn deduplicate(d: Derivation) -> Vec<(Expr, (i32, std::option::Option<RuleRef>))> {
     let mut cache: DerivationCache = HashMap::new();
 
     deduplicate_h(d, &mut cache, &mut 0);
 
-    let mut s = cache.drain().collect::<Vec<_>>();
-    s.sort_unstable_by(|(_, v1), (_, v2)| v1.0.cmp(&v2.0));
-    for (k, v) in s {
-        println!("{} {:?}", parser::stringify(k), v);
-    }
-
     println!("{:?}", cache);
     println!("{:?}", cache.values());
+    let mut s = cache.drain().collect::<Vec<_>>();
+
+    s.sort_unstable_by(|(_, v1), (_, v2)| v1.0.cmp(&v2.0));
+    s
+    // s.iter()
+    //     .map(|(k, v)| format!("{} {:?}", parser::stringify(k.clone()), v))
+    //     .collect::<Vec<_>>()
+    //     .join("\n")
 }
+
 #[test]
 fn dedup() {
     let e = parser::parse_judgement("a: *, b:*,c:*,d:* |- a -> b -> c->d : *").unwrap();
     let d = derive(e).unwrap();
-    deduplicate(d);
+    let s = deduplicate(d);
+    println!("{:?}", s);
     panic!();
 }
 
@@ -431,6 +435,26 @@ pub fn derivation(s: &str) -> String {
     match parser::parse_judgement(s) {
         Ok(j) => match derive(j) {
             Ok(d) => stringify(d),
+            Err(e) => format!("{}", e),
+        },
+        Err(e) => format!("{}", e),
+    }
+}
+
+pub fn derivation_html(s: &str) -> String {
+    match parser::parse_judgement(s) {
+        Ok(j) => match derive(j) {
+            Ok(d) => deduplicate(d)
+                .iter()
+                .map(|(k, v)| {
+                    format!(
+                        r#"{} <code class="rule">{:?}</code>"#,
+                        parser::htmlify(k.clone()),
+                        v
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n"),
             Err(e) => format!("{}", e),
         },
         Err(e) => format!("{}", e),
