@@ -46,8 +46,8 @@ struct Derivation {
 
 #[derive(Hash, Debug, Error, PartialEq, Eq, Clone)]
 enum DeriveError {
-    #[error("Derivation unimplemented for judgement {0}.")]
-    Unimplemented(String),
+    #[error("Derivation not implemented for judgement {0}.")]
+    NotImplemented(String),
     #[error("Unexpected type {0} in judgement {1}.\nThe type of a Pi abstraction must be a sort (either ∗ or □).")]
     UnexpectedPiAbstractionType(String, String),
     #[error("Can't infer identifier {0} in context {1}.")]
@@ -321,7 +321,7 @@ fn derive(judgement: Expr) -> Result<Derivation, DeriveError> {
                     Err(e) => return Err(e),
                 }
             }
-            Err(DeriveError::Unimplemented(parser::stringify(judgement)))
+            Err(DeriveError::NotImplemented(parser::stringify(judgement)))
             // panic!(
             //     "ctx:  {:?}\nexpr: {:?}\ntype: {:?}",
             //     context, judgement_expr, judgement_type
