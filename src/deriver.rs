@@ -56,6 +56,10 @@ enum DeriveError {
     InferBox,
     #[error("Can't infer the type of {0} in context {1}.")]
     InferApplication(String, String),
+    #[error(
+        "Form rule inferred (s1,s2) = ({0},{1}), but s1 and s2 can only be sorts (either ∗ or □)."
+    )]
+    InferForm(String, String),
 }
 
 fn append_to_context(ident: Expr, etype: Expr, context: Vec<Expr>) -> Vec<Expr> {
@@ -66,12 +70,12 @@ fn append_to_context(ident: Expr, etype: Expr, context: Vec<Expr>) -> Vec<Expr> 
     context.iter().cloned().chain(std::iter::once(fv)).collect()
 }
 
-fn determine_sort(expr: Expr, context: Vec<Expr>) -> Expr {
-    match expr {
-        Expr::Star => Expr::Box,
-        _ => Expr::Star, // this is most likely wrong
-    }
-}
+// fn determine_sort(expr: Expr, context: Vec<Expr>) -> Expr {
+//     match expr {
+//         Expr::Star => Expr::Box,
+//         _ => Expr::Star, // this is most likely wrong
+//     }
+// }
 
 fn find_type_in_context(ident: &Expr, context: &Vec<Expr>) -> Option<Expr> {
     for expr in context {
@@ -174,6 +178,10 @@ fn derive(judgement: Expr) -> Result<Derivation, DeriveError> {
                     let last_fv_type = *ident_type.clone();
                     let new_context = all_except_last(context.to_vec());
 
+                    // println!(
+                    //     "\n{:?}\n{:?}\n{:?}\n{:?}\n",
+                    //     last_fv, judgement_expr, last_fv_type, judgement_type
+                    // );
                     // Var rule
                     if last_fv == judgement_expr && last_fv_type == judgement_type {
                         // let ident_type_sort = match ident_type {
@@ -188,6 +196,16 @@ fn derive(judgement: Expr) -> Result<Derivation, DeriveError> {
                         // };
 
                         // TODO x \not\in\ context
+                        let aa = infer_type(context.to_vec(), last_fv_type.clone());
+                        let p1 = match aa {
+                            Ok(t) => Some(Box::new(derive(Expr::Judgement {
+                                context: new_context,
+                                expr: Box::new(last_fv_type.clone()),
+                                etype: Box::new(t),
+                            }))),
+                            Err(e) => Some(Box::new(Err(e))),
+                        };
+
                         return Ok(Derivation {
                             rule: Rule::Var,
                             conclusion: Expr::Judgement {
@@ -195,11 +213,7 @@ fn derive(judgement: Expr) -> Result<Derivation, DeriveError> {
                                 expr: Box::new(judgement_expr),
                                 etype: Box::new(judgement_type),
                             },
-                            premiss_one: Some(Box::new(derive(Expr::Judgement {
-                                context: new_context,
-                                expr: Box::new(last_fv_type.clone()),
-                                etype: Box::new(determine_sort(last_fv_type, context.to_vec())),
-                            }))),
+                            premiss_one: p1,
                             premiss_two: None,
                         });
                     }
@@ -218,11 +232,15 @@ fn derive(judgement: Expr) -> Result<Derivation, DeriveError> {
                                 etype: Box::new(judgement_type),
                             })));
 
-                            let premiss_two = Some(Box::new(derive(Expr::Judgement {
-                                context: new_context,
-                                expr: Box::new(last_fv_type.clone()),
-                                etype: Box::new(determine_sort(last_fv_type, context.to_vec())),
-                            })));
+                            let premiss_two =
+                                match infer_type(context.to_vec(), last_fv_type.clone()) {
+                                    Ok(t) => Some(Box::new(derive(Expr::Judgement {
+                                        context: new_context,
+                                        expr: Box::new(last_fv_type.clone()),
+                                        etype: Box::new(t),
+                                    }))),
+                                    Err(e) => Some(Box::new(Err(e))),
+                                };
 
                             return Ok(Derivation {
                                 rule: Rule::Weak,
@@ -252,13 +270,21 @@ fn derive(judgement: Expr) -> Result<Derivation, DeriveError> {
                         parser::stringify(judgement),
                     ));
                 }
-
-                let p1_type = determine_sort(*pi_type.clone(), context.to_vec());
-                let premiss_one = Some(Box::new(derive(Expr::Judgement {
-                    context: context.to_vec(),
-                    expr: pi_type.clone(),
-                    etype: Box::new(p1_type.clone()),
-                })));
+                let p1_type = infer_type(context.to_vec(), *pi_type.clone());
+                if p1_type.clone().unwrap() != Expr::Star && p1_type.clone().unwrap() != Expr::Box {
+                    println!(
+                        "\n{:?}\n\n{:?}\n{:?}\n{:?}\n",
+                        judgement, context, pi_type, p1_type
+                    );
+                }
+                let premiss_one = match p1_type.clone() {
+                    Ok(t) => Some(Box::new(derive(Expr::Judgement {
+                        context: context.to_vec(),
+                        expr: pi_type.clone(),
+                        etype: Box::new(t),
+                    }))),
+                    Err(e) => Some(Box::new(Err(e))),
+                };
 
                 let pi_ident = match pi_ident {
                     Some(i) => *i,
@@ -271,18 +297,30 @@ fn derive(judgement: Expr) -> Result<Derivation, DeriveError> {
                     etype: Box::new(judgement_type.clone()),
                 })));
                 let s2 = judgement_type.clone();
-                let s1 = p1_type;
 
-                return Ok(Derivation {
-                    rule: Rule::Form(s1, s2),
-                    conclusion: Expr::Judgement {
-                        context: context.to_vec(),
-                        expr: Box::new(judgement_expr),
-                        etype: Box::new(judgement_type),
+                match p1_type {
+                    Ok(s1) => match (s1.clone(), s2.clone()) {
+                        (Expr::Star | Expr::Box, Expr::Star | Expr::Box) => {
+                            return Ok(Derivation {
+                                rule: Rule::Form(s1, s2),
+                                conclusion: Expr::Judgement {
+                                    context: context.to_vec(),
+                                    expr: Box::new(judgement_expr),
+                                    etype: Box::new(judgement_type),
+                                },
+                                premiss_one,
+                                premiss_two,
+                            })
+                        }
+                        (_, _) => {
+                            return Err(DeriveError::InferForm(
+                                parser::stringify(s1),
+                                parser::stringify(s2),
+                            ))
+                        }
                     },
-                    premiss_one,
-                    premiss_two,
-                });
+                    Err(e) => return Err(e),
+                }
             }
 
             // Appl
@@ -290,8 +328,10 @@ fn derive(judgement: Expr) -> Result<Derivation, DeriveError> {
                 match infer_type(context.to_vec(), judgement_expr.clone()) {
                     Ok(a) => {
                         // TODO B[x:=N] in reverse
+                        // TODO new free variable "x"
                         let p1_type = Expr::PiAbstraction {
-                            ident: Some(Box::new(Expr::Identifier("x".to_string()))),
+                            // ident: Some(Box::new(Expr::Identifier("x".to_string()))),
+                            ident: None,
                             etype: Box::new(a.clone()),
                             body: Box::new(judgement_type.clone()),
                         };
@@ -557,3 +597,5 @@ pub fn derivation_html(s: &str) -> String {
         Err(e) => format!("<code>{}</code>", e),
     }
 }
+
+// a:*->*,b:*,m:a->b,n:a |- a b : *
