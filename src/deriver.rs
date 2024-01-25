@@ -46,10 +46,16 @@ struct Derivation {
 
 #[derive(Debug, Error)]
 enum DeriveError {
-    #[error("Derivation unimplemented for judgement: {0}")]
+    #[error("Derivation unimplemented for judgement {0}.")]
     Unimplemented(String),
     #[error("Unexpected type {0} in judgement {1}.\nThe type of a Pi abstraction must be a sort (either ∗ or □).")]
     UnexpectedPiAbstractionType(String, String),
+    #[error("Can't infer identifier {0} in context {1}.")]
+    InferIdentifier(String, String),
+    #[error("Can't infer the type of □.")]
+    InferBox,
+    #[error("Can't infer the type of {0} in context {1}.")]
+    InferApplication(String, String),
 }
 
 fn append_to_context(ident: Expr, etype: Expr, context: Vec<Expr>) -> Vec<Expr> {
@@ -64,34 +70,56 @@ fn determine_sort(expr: Expr, context: Vec<Expr>) -> Expr {
     match expr {
         Expr::Star => Expr::Box,
         _ => Expr::Star, // this is most likely wrong
-
-                         // Expr::Identifier(_) => todo!(),
-                         // Expr::Box => todo!(),
-                         // Expr::Bottom => todo!(),
-                         // Expr::Application { lhs, rhs } => todo!(),
-                         // Expr::LambdaAbstraction { ident, etype, body } => todo!(),
-                         // Expr::PiAbstraction { ident, etype, body } => todo!(),
-                         // Expr::FreeVariable { ident, etype } => todo!(),
-                         // Expr::Judgement {
-                         //     context,
-                         //     expr,
-                         //     etype,
-                         // } => todo!(),
     }
 }
 
-fn find_type_in_context(ident: Expr, context: Vec<Expr>) -> Option<Expr> {
+fn find_type_in_context(ident: &Expr, context: &Vec<Expr>) -> Option<Expr> {
     for expr in context {
         match expr {
             Expr::FreeVariable { ident: fv, etype } => {
-                if ident == *fv {
-                    return Some(*etype);
+                if ident == &**fv {
+                    return Some(*etype.clone());
                 }
             }
             _ => (),
         }
     }
     None
+}
+
+fn infer_type(context: Vec<Expr>, expr: Expr) -> Result<Expr, DeriveError> {
+    match expr {
+        Expr::Identifier(_) => find_type_in_context(&expr, &context).ok_or(
+            DeriveError::InferIdentifier(parser::stringify(expr), format!("{:?}", context)),
+        ),
+        Expr::Star => Ok(Expr::Box),
+        Expr::Box => Err(DeriveError::InferBox),
+        Expr::Bottom => todo!(),
+        Expr::Application { lhs, rhs } => match infer_type(context.clone(), *lhs.clone()) {
+            Ok(r) => match r {
+                Expr::PiAbstraction {
+                    ident: _,
+                    etype: _,
+                    body,
+                } => Ok(*body),
+                _ => Err(DeriveError::InferApplication(
+                    parser::stringify(*lhs),
+                    format!("{:?}", context),
+                )),
+            },
+            Err(e) => Err(e),
+        },
+        Expr::LambdaAbstraction { ident, etype, body } => match infer_type(context, *body) {
+            Ok(body) => Ok(Expr::PiAbstraction {
+                ident: None,
+                etype,
+                body: Box::new(body),
+            }),
+            err => err,
+        },
+        Expr::PiAbstraction { ident, etype, body } => infer_type(context, *body),
+        _ => unreachable!(),
+    }
 }
 
 fn all_except_last<Expr: std::clone::Clone>(context: Vec<Expr>) -> Vec<Expr> {
@@ -234,7 +262,7 @@ fn derive(judgement: Expr) -> Result<Derivation, DeriveError> {
 
                 let pi_ident = match pi_ident {
                     Some(i) => *i,
-                    None => Expr::Identifier("_".to_string()), // TODO search free variables, pick a new one?
+                    None => Expr::Identifier("_".to_string()), // TODO search free variables, pick a new one
                 };
 
                 let premiss_two = Some(Box::new(derive(Expr::Judgement {
@@ -255,6 +283,43 @@ fn derive(judgement: Expr) -> Result<Derivation, DeriveError> {
                     premiss_one,
                     premiss_two,
                 });
+            }
+
+            // Appl
+            if let Expr::Application { lhs, rhs } = judgement_expr.clone() {
+                match infer_type(context.to_vec(), judgement_expr.clone()) {
+                    Ok(a) => {
+                        // TODO B[x:=N] in reverse
+                        let p1_type = Expr::PiAbstraction {
+                            ident: Some(Box::new(Expr::Identifier("x".to_string()))),
+                            etype: Box::new(a.clone()),
+                            body: Box::new(judgement_type.clone()),
+                        };
+                        let p1 = Some(Box::new(derive(Expr::Judgement {
+                            context: context.to_vec(),
+                            expr: lhs,
+                            etype: Box::new(p1_type),
+                        })?));
+
+                        let p2 = Some(Box::new(derive(Expr::Judgement {
+                            context: context.to_vec(),
+                            expr: rhs,
+                            etype: Box::new(a),
+                        })?));
+
+                        return Ok(Derivation {
+                            rule: Rule::Appl,
+                            conclusion: Expr::Judgement {
+                                context: context.to_vec(),
+                                expr: Box::new(judgement_expr),
+                                etype: Box::new(judgement_type),
+                            },
+                            premiss_one: p1,
+                            premiss_two: p2,
+                        });
+                    }
+                    Err(e) => return Err(e),
+                }
             }
             Err(DeriveError::Unimplemented(parser::stringify(judgement)))
             // panic!(
