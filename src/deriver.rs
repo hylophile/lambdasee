@@ -40,11 +40,11 @@ impl fmt::Display for Rule {
 struct Derivation {
     conclusion: Expr,
     rule: Rule,
-    premiss_one: Option<Box<Derivation>>,
-    premiss_two: Option<Box<Derivation>>,
+    premiss_one: Option<Box<Result<Derivation, DeriveError>>>,
+    premiss_two: Option<Box<Result<Derivation, DeriveError>>>,
 }
 
-#[derive(Debug, Error)]
+#[derive(Hash, Debug, Error, PartialEq, Eq, Clone)]
 enum DeriveError {
     #[error("Derivation unimplemented for judgement {0}.")]
     Unimplemented(String),
@@ -199,7 +199,7 @@ fn derive(judgement: Expr) -> Result<Derivation, DeriveError> {
                                 context: new_context,
                                 expr: Box::new(last_fv_type.clone()),
                                 etype: Box::new(determine_sort(last_fv_type, context.to_vec())),
-                            })?)),
+                            }))),
                             premiss_two: None,
                         });
                     }
@@ -216,13 +216,13 @@ fn derive(judgement: Expr) -> Result<Derivation, DeriveError> {
                                 context: new_context.clone(),
                                 expr: Box::new(judgement_expr),
                                 etype: Box::new(judgement_type),
-                            })?));
+                            })));
 
                             let premiss_two = Some(Box::new(derive(Expr::Judgement {
                                 context: new_context,
                                 expr: Box::new(last_fv_type.clone()),
                                 etype: Box::new(determine_sort(last_fv_type, context.to_vec())),
-                            })?));
+                            })));
 
                             return Ok(Derivation {
                                 rule: Rule::Weak,
@@ -258,7 +258,7 @@ fn derive(judgement: Expr) -> Result<Derivation, DeriveError> {
                     context: context.to_vec(),
                     expr: pi_type.clone(),
                     etype: Box::new(p1_type.clone()),
-                })?));
+                })));
 
                 let pi_ident = match pi_ident {
                     Some(i) => *i,
@@ -269,7 +269,7 @@ fn derive(judgement: Expr) -> Result<Derivation, DeriveError> {
                     context: append_to_context(pi_ident, *pi_type.clone(), context.to_vec()),
                     expr: pi_body,
                     etype: Box::new(judgement_type.clone()),
-                })?));
+                })));
                 let s2 = judgement_type.clone();
                 let s1 = p1_type;
 
@@ -299,13 +299,13 @@ fn derive(judgement: Expr) -> Result<Derivation, DeriveError> {
                             context: context.to_vec(),
                             expr: lhs,
                             etype: Box::new(p1_type),
-                        })?));
+                        })));
 
                         let p2 = Some(Box::new(derive(Expr::Judgement {
                             context: context.to_vec(),
                             expr: rhs,
                             etype: Box::new(a),
-                        })?));
+                        })));
 
                         return Ok(Derivation {
                             rule: Rule::Appl,
@@ -364,70 +364,99 @@ fn moo() {
     assert_eq!("", x);
 }
 
-fn stringify(derivation: Derivation) -> String {
-    stringify_h(derivation, 0, 0).1
+// fn stringify(derivation: Derivation) -> String {
+//     stringify_h(derivation, 0, 0).1
+// }
+
+// fn stringify_h(derivation: Derivation, counter: u32, width: usize) -> (u32, String) {
+//     let conclusion = parser::stringify(derivation.conclusion.clone());
+//     let counter = counter + 1;
+
+//     let width = width.max(conclusion.len());
+//     // println!("{} {}", width, conclusion.len());
+//     match (derivation.premiss_one, derivation.premiss_two) {
+//         (Some(p1), Some(p2)) => {
+//             let (p1_counter, p1s) = stringify_h(*(p1.clone()), counter, width);
+//             let (p2_counter, p2s) = stringify_h(*p2, p1_counter, width);
+//             let rule = match derivation.rule {
+//                 Rule::Form(_, _) => {
+//                     format!("{}", derivation.rule)
+//                 }
+//                 rule => format!("{}", rule),
+//             };
+//             (
+//                 p2_counter,
+//                 format!(
+//                     "{:>5} {:width$} ({}) on [{}] and [{}]\n{}\n{}\n",
+//                     format!("[{counter}]"),
+//                     conclusion,
+//                     rule,
+//                     counter + 1,
+//                     p1_counter + 1,
+//                     p1s,
+//                     p2s,
+//                 ),
+//             )
+//         }
+//         (Some(p1), None) => {
+//             let (p1_counter, p1s) = stringify_h(*p1, counter, width);
+//             (
+//                 p1_counter,
+//                 format!(
+//                     "{:>5} {:width$} {} on [{}]\n{}\n",
+//                     format!("[{counter}]"),
+//                     conclusion,
+//                     derivation.rule,
+//                     counter + 1,
+//                     p1s,
+//                 ),
+//             )
+//         }
+//         _ => (
+//             counter,
+//             // "".to_string(),
+//             format!(
+//                 "{:>5} {:width$} ({})",
+//                 format!("[{counter}]"),
+//                 conclusion,
+//                 derivation.rule,
+//             ),
+//         ),
+//     }
+// }
+#[derive(Debug, PartialEq, Eq, Hash)]
+enum RuleRef {
+    None(Rule),
+    One(Rule, i32),
+    Two(Rule, i32, i32),
 }
 
-fn stringify_h(derivation: Derivation, counter: u32, width: usize) -> (u32, String) {
-    let conclusion = parser::stringify(derivation.conclusion.clone());
-    let counter = counter + 1;
-
-    let width = width.max(conclusion.len());
-    // println!("{} {}", width, conclusion.len());
-    match (derivation.premiss_one, derivation.premiss_two) {
-        (Some(p1), Some(p2)) => {
-            let (p1_counter, p1s) = stringify_h(*(p1.clone()), counter, width);
-            let (p2_counter, p2s) = stringify_h(*p2, p1_counter, width);
-            let rule = match derivation.rule {
-                Rule::Form(_, _) => {
-                    format!("{}", derivation.rule)
-                }
-                rule => format!("{}", rule),
-            };
-            (
-                p2_counter,
-                format!(
-                    "{:>5} {:width$} ({}) on [{}] and [{}]\n{}\n{}\n",
-                    format!("[{counter}]"),
-                    conclusion,
-                    rule,
-                    counter + 1,
-                    p1_counter + 1,
-                    p1s,
-                    p2s,
-                ),
-            )
-        }
-        (Some(p1), None) => {
-            let (p1_counter, p1s) = stringify_h(*p1, counter, width);
-            (
-                p1_counter,
-                format!(
-                    "{:>5} {:width$} {} on [{}]\n{}\n",
-                    format!("[{counter}]"),
-                    conclusion,
-                    derivation.rule,
-                    counter + 1,
-                    p1s,
-                ),
-            )
-        }
-        _ => (
-            counter,
-            // "".to_string(),
-            format!(
-                "{:>5} {:width$} ({})",
-                format!("[{counter}]"),
-                conclusion,
-                derivation.rule,
-            ),
-        ),
+impl fmt::Display for RuleRef {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let s = match self {
+            RuleRef::None(r) => format!("{}", r),
+            RuleRef::One(r, p1) => format!("{} on [{}]", r, p1),
+            RuleRef::Two(r, p1, p2) => format!("{} on [{}] and [{}]", r, p1, p2),
+        };
+        write!(f, "{}", s)
     }
 }
 
-type DerivationCache = HashMap<Expr, (i32, Option<RuleRef>)>;
+type DerivationCache = HashMap<CacheEntry, (i32, Option<RuleRef>)>;
 
-fn deduplicate(d: Derivation) -> Vec<(Expr, (i32, std::option::Option<RuleRef>))> {
+#[derive(Hash, PartialEq, Eq, Debug, Clone)]
+enum CacheEntry {
+    Expr(Expr),
+    DeriveError(DeriveError),
+}
+
+// impl CacheEntry {
+//     fn new()
+// }
+
+fn deduplicate(
+    d: Result<Derivation, DeriveError>,
+) -> Vec<(CacheEntry, (i32, std::option::Option<RuleRef>))> {
     let mut cache: DerivationCache = HashMap::new();
 
     deduplicate_h(d, &mut cache, &mut 0);
@@ -447,84 +476,84 @@ fn deduplicate(d: Derivation) -> Vec<(Expr, (i32, std::option::Option<RuleRef>))
 #[test]
 fn dedup() {
     let e = parser::parse_judgement("a: *, b:*,c:*,d:* |- a -> b -> c->d : *").unwrap();
-    let d = derive(e).unwrap();
+    let d = derive(e);
     let s = deduplicate(d);
     println!("{:?}", s);
     panic!();
 }
 
-impl fmt::Display for RuleRef {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let s = match self {
-            RuleRef::None(r) => format!("{}", r),
-            RuleRef::One(r, p1) => format!("{} on [{}]", r, p1),
-            RuleRef::Two(r, p1, p2) => format!("{} on [{}] and [{}]", r, p1, p2),
-        };
-        write!(f, "{}", s)
-    }
-}
+fn deduplicate_h(d: Result<Derivation, DeriveError>, c: &mut DerivationCache, id: &mut i32) -> i32 {
+    match d {
+        Ok(d) => {
+            let e = CacheEntry::Expr(d.conclusion.clone());
+            c.entry(e).or_insert_with(|| {
+                let x = *id;
+                *id = *id + 1;
+                (x, None)
+            });
+            let rule_ref = match (d.premiss_one, d.premiss_two) {
+                (Some(p1), Some(p2)) => {
+                    let p1_id = deduplicate_h(*p1, c, id);
+                    let p2_id = deduplicate_h(*p2, c, id);
+                    Some(RuleRef::Two(d.rule, p1_id, p2_id))
+                }
+                (Some(p1), None) => {
+                    let p1_id = deduplicate_h(*p1, c, id);
+                    Some(RuleRef::One(d.rule, p1_id))
+                }
+                _ => Some(RuleRef::None(d.rule)),
+            };
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-enum RuleRef {
-    None(Rule),
-    One(Rule, i32),
-    Two(Rule, i32, i32),
-}
-
-fn deduplicate_h(d: Derivation, c: &mut DerivationCache, id: &mut i32) -> i32 {
-    c.entry(d.conclusion.clone()).or_insert_with(|| {
-        let x = *id;
-        *id = *id + 1;
-        (x, None)
-    });
-
-    let rule_ref = match (d.premiss_one, d.premiss_two) {
-        (Some(p1), Some(p2)) => {
-            let p1_id = deduplicate_h(*p1, c, id);
-            let p2_id = deduplicate_h(*p2, c, id);
-            Some(RuleRef::Two(d.rule, p1_id, p2_id))
+            if let Some(k) = c.get_mut(&CacheEntry::Expr(d.conclusion)) {
+                k.1 = rule_ref;
+                return k.0;
+            }
+            unreachable!()
         }
-        (Some(p1), None) => {
-            let p1_id = deduplicate_h(*p1, c, id);
-            Some(RuleRef::One(d.rule, p1_id))
+        Err(e) => {
+            let e = CacheEntry::DeriveError(e);
+            let x = c.entry(e).or_insert_with(|| {
+                let x = *id;
+                *id = *id + 1;
+                (x, None)
+            });
+            return x.0;
         }
-        _ => Some(RuleRef::None(d.rule)),
-    };
-
-    if let Some(k) = c.get_mut(&d.conclusion) {
-        k.1 = rule_ref;
-        return k.0;
-    }
-    unreachable!()
-}
-
-pub fn derivation(s: &str) -> String {
-    match parser::parse_judgement(s) {
-        Ok(j) => match derive(j) {
-            Ok(d) => stringify(d),
-            Err(e) => format!("{}", e),
-        },
-        Err(e) => format!("{}", e),
     }
 }
+
+// pub fn derivation(s: &str) -> String {
+//     match parser::parse_judgement(s) {
+//         Ok(j) => match derive(j) {
+//             Ok(d) => stringify(d),
+//             Err(e) => format!("{}", e),
+//         },
+//         Err(e) => format!("{}", e),
+//     }
+// }
 
 pub fn derivation_html(s: &str) -> String {
     match parser::parse_judgement(s) {
-        Ok(j) => match derive(j) {
-            Ok(d) => deduplicate(d)
-                .iter()
-                .map(|(k, (id, rule))| {
+        Ok(d) => deduplicate(derive(d))
+            .iter()
+            .map(|(k, (id, rule))| match k {
+                CacheEntry::Expr(e) => {
                     format!(
                         r#"<span class="id">[{}]</span> {} <span class="rule">{}</span>"#,
                         id,
-                        parser::htmlify(k.clone()),
+                        parser::htmlify(e.clone()),
                         rule.as_ref().expect("unreachable")
                     )
-                })
-                .collect::<Vec<_>>()
-                .join("\n"),
-            Err(e) => format!("<code>{}</code>", e),
-        },
+                }
+                CacheEntry::DeriveError(e) => {
+                    format!(
+                        r#"<span class="id">[{}]</span> <span class="error">{}</span>"#,
+                        id, e
+                    )
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n"),
         Err(e) => format!("<code>{}</code>", e),
     }
 }
