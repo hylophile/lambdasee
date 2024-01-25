@@ -325,41 +325,41 @@ fn derive(judgement: Expr) -> Result<Derivation, DeriveError> {
 
             // Appl
             if let Expr::Application { lhs, rhs } = judgement_expr.clone() {
-                match infer_type(context.to_vec(), judgement_expr.clone()) {
-                    Ok(a) => {
-                        // TODO B[x:=N] in reverse
-                        // TODO new free variable "x"
-                        let p1_type = Expr::PiAbstraction {
-                            // ident: Some(Box::new(Expr::Identifier("x".to_string()))),
-                            ident: None,
-                            etype: Box::new(a.clone()),
-                            body: Box::new(judgement_type.clone()),
-                        };
-                        let p1 = Some(Box::new(derive(Expr::Judgement {
-                            context: context.to_vec(),
-                            expr: lhs,
-                            etype: Box::new(p1_type),
-                        })));
+                // TODO B[x:=N] in reverse
+                // TODO new free variable "x"
 
-                        let p2 = Some(Box::new(derive(Expr::Judgement {
-                            context: context.to_vec(),
-                            expr: rhs,
-                            etype: Box::new(a),
-                        })));
+                let p1_type = infer_type(context.to_vec(), *lhs.clone())?;
+                let p2_type = infer_type(context.to_vec(), *rhs.clone())?;
+                // TODO check p1_type == piabstr && pitype == p2_type && pibody == pibody[x:=N]
 
-                        return Ok(Derivation {
-                            rule: Rule::Appl,
-                            conclusion: Expr::Judgement {
-                                context: context.to_vec(),
-                                expr: Box::new(judgement_expr),
-                                etype: Box::new(judgement_type),
-                            },
-                            premiss_one: p1,
-                            premiss_two: p2,
-                        });
-                    }
-                    Err(e) => return Err(e),
-                }
+                // let p1_type = Expr::PiAbstraction {
+                //     // ident: Some(Box::new(Expr::Identifier("x".to_string()))),
+                //     ident: None,
+                //     etype: Box::new(b.clone()),
+                //     body: Box::new(judgement_type.clone()),
+                // };
+                let p1 = Some(Box::new(derive(Expr::Judgement {
+                    context: context.to_vec(),
+                    expr: lhs,
+                    etype: Box::new(p1_type),
+                })));
+
+                let p2 = Some(Box::new(derive(Expr::Judgement {
+                    context: context.to_vec(),
+                    expr: rhs,
+                    etype: Box::new(p2_type),
+                })));
+
+                return Ok(Derivation {
+                    rule: Rule::Appl,
+                    conclusion: Expr::Judgement {
+                        context: context.to_vec(),
+                        expr: Box::new(judgement_expr),
+                        etype: Box::new(judgement_type),
+                    },
+                    premiss_one: p1,
+                    premiss_two: p2,
+                });
             }
             Err(DeriveError::NotImplemented(parser::stringify(judgement)))
             // panic!(
