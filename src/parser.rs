@@ -242,8 +242,8 @@ fn e() {
     let line = "a:b⊢a : (b)";
     assert_eq!("a : b ⊢ a : b", stringify(parse_judgement(line).unwrap()));
 
-    let line = "C ⊢ λα : ∗ . λβ : (∗ → ∗) . a b β(β α) : ∗ → (∗ → ∗) → ∗";
-    let line = "C ⊢ λα : ∗ . λβ : (∗ → ∗) . a b β(β α) : ∗ → ∗ → ∗ → ∗";
+    let _line = "C ⊢ λα : ∗ . λβ : (∗ → ∗) . a b β(β α) : ∗ → (∗ → ∗) → ∗";
+    let _line = "C ⊢ λα : ∗ . λβ : (∗ → ∗) . a b β(β α) : ∗ → ∗ → ∗ → ∗";
     let line = "C |- (Πx : S . (A → P x)) → A → Πy : S . P y : kp";
     // let line = "C |- (Πx : S . (A → P x)) : p";
     // let line = "C |- A → P x : p";
@@ -273,30 +273,30 @@ pub fn parse_judgement(input: &str) -> Result<Expr, pest::error::Error<Rule>> {
     }
 }
 
-fn p_program(input: &str) -> Result<String, pest::error::Error<Rule>> {
-    // let line = "(Πx : S . (A → P x)) → A → Πy : S . P y";
-    // let line = "∅ ⊢ λα : ∗ . λβ : (∗ → ∗) . β(β α) : ∗ → (∗ → ∗) → ∗";
-    // let line = "α : ∗ . λβ : ∗ . α → β : e";
-    // let line = "(λα : ∗ . α → α) (γ → β)";
-    // let line = "(λα : ∗ . α → α) γ";
-    // let line = "(Πy : S . P y)";
-    // let line = "a -> b";
-    // let line = "a";
-    // let line = "a b";
-    // let line = "a b c";
+// fn p_program(input: &str) -> Result<String, pest::error::Error<Rule>> {
+//     // let line = "(Πx : S . (A → P x)) → A → Πy : S . P y";
+//     // let line = "∅ ⊢ λα : ∗ . λβ : (∗ → ∗) . β(β α) : ∗ → (∗ → ∗) → ∗";
+//     // let line = "α : ∗ . λβ : ∗ . α → β : e";
+//     // let line = "(λα : ∗ . α → α) (γ → β)";
+//     // let line = "(λα : ∗ . α → α) γ";
+//     // let line = "(Πy : S . P y)";
+//     // let line = "a -> b";
+//     // let line = "a";
+//     // let line = "a b";
+//     // let line = "a b c";
 
-    match CalculatorParser::parse(Rule::program, &input) {
-        Ok(mut pairs) => {
-            // let a = pairs.next().unwrap();
-            println!("p: {pairs}");
-            let a = pairs.next().unwrap().into_inner();
-            let x = parse_expr(a);
-            let s = format!("{:#?}", x);
-            Ok(s)
-        }
-        Err(e) => Err(e),
-    }
-}
+//     match CalculatorParser::parse(Rule::program, &input) {
+//         Ok(mut pairs) => {
+//             // let a = pairs.next().unwrap();
+//             println!("p: {pairs}");
+//             let a = pairs.next().unwrap().into_inner();
+//             let x = parse_expr(a);
+//             let s = format!("{:#?}", x);
+//             Ok(s)
+//         }
+//         Err(e) => Err(e),
+//     }
+// }
 
 // fn miain() -> io::Result<()> {
 //     let line = "(Πx : S . (A → P x)) → A → Πy : S . P y";
