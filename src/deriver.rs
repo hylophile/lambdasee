@@ -23,14 +23,14 @@ impl fmt::Display for Rule {
         // write!(f, "({}, {})", self.0, self.1)
         let s = match self {
             // Rule::Var => " (var)".to_string(),
-            Rule::Form(s1, s2) => format!(
+            Self::Form(s1, s2) => format!(
                 "(form ({},{}))",
                 parser::stringify(s1.clone()),
                 parser::stringify(s2.clone())
             ),
-            _ => format!("({:?})", self).to_lowercase(),
+            _ => format!("({self:?})").to_lowercase(),
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -94,7 +94,7 @@ fn find_type_in_context(ident: &Expr, context: &Vec<Expr>) -> Option<Expr> {
 fn infer_type(context: Vec<Expr>, expr: Expr) -> Result<Expr, DeriveError> {
     match expr {
         Expr::Identifier(_) => find_type_in_context(&expr, &context).ok_or(
-            DeriveError::InferIdentifier(parser::stringify(expr), format!("{:?}", context)),
+            DeriveError::InferIdentifier(parser::stringify(expr), format!("{context:?}")),
         ),
         Expr::Star => Ok(Expr::Box),
         Expr::Box => Err(DeriveError::InferBox),
@@ -108,7 +108,7 @@ fn infer_type(context: Vec<Expr>, expr: Expr) -> Result<Expr, DeriveError> {
                 } => Ok(*body),
                 _ => Err(DeriveError::InferApplication(
                     parser::stringify(*lhs),
-                    format!("{:?}", context),
+                    format!("{context:?}"),
                 )),
             },
             Err(e) => Err(e),
@@ -135,7 +135,7 @@ fn infer_type(context: Vec<Expr>, expr: Expr) -> Result<Expr, DeriveError> {
 }
 
 fn all_except_last<Expr: std::clone::Clone>(context: Vec<Expr>) -> Vec<Expr> {
-    if context.len() > 0 {
+    if !context.is_empty() {
         context[..context.len() - 1].to_vec()
     } else {
         vec![]
@@ -208,7 +208,7 @@ fn derive(judgement: Expr) -> Result<Derivation, DeriveError> {
                         let p1 = match aa {
                             Ok(t) => Some(Box::new(derive(Expr::Judgement {
                                 context: new_context,
-                                expr: Box::new(last_fv_type.clone()),
+                                expr: Box::new(last_fv_type),
                                 etype: Box::new(t),
                             }))),
                             Err(e) => Some(Box::new(Err(e))),
@@ -244,7 +244,7 @@ fn derive(judgement: Expr) -> Result<Derivation, DeriveError> {
                                 match infer_type(context.to_vec(), last_fv_type.clone()) {
                                     Ok(t) => Some(Box::new(derive(Expr::Judgement {
                                         context: new_context,
-                                        expr: Box::new(last_fv_type.clone()),
+                                        expr: Box::new(last_fv_type),
                                         etype: Box::new(t),
                                     }))),
                                     Err(e) => Some(Box::new(Err(e))),
@@ -281,8 +281,7 @@ fn derive(judgement: Expr) -> Result<Derivation, DeriveError> {
                 let p1_type = infer_type(context.to_vec(), *pi_type.clone());
                 if p1_type.clone().unwrap() != Expr::Star && p1_type.clone().unwrap() != Expr::Box {
                     println!(
-                        "\n{:?}\n\n{:?}\n{:?}\n{:?}\n",
-                        judgement, context, pi_type, p1_type
+                        "\n{judgement:?}\n\n{context:?}\n{pi_type:?}\n{p1_type:?}\n"
                     );
                 }
                 let premiss_one = match p1_type.clone() {
@@ -300,7 +299,7 @@ fn derive(judgement: Expr) -> Result<Derivation, DeriveError> {
                 };
 
                 let premiss_two = Some(Box::new(derive(Expr::Judgement {
-                    context: append_to_context(pi_ident, *pi_type.clone(), context.to_vec()),
+                    context: append_to_context(pi_ident, *pi_type, context.to_vec()),
                     expr: pi_body,
                     etype: Box::new(judgement_type.clone()),
                 })));
@@ -482,11 +481,11 @@ enum RuleRef {
 impl fmt::Display for RuleRef {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let s = match self {
-            RuleRef::None(r) => format!("{}", r),
-            RuleRef::One(r, p1) => format!("{} on [{}]", r, p1),
-            RuleRef::Two(r, p1, p2) => format!("{} on [{}] and [{}]", r, p1, p2),
+            Self::None(r) => format!("{r}"),
+            Self::One(r, p1) => format!("{r} on [{p1}]"),
+            Self::Two(r, p1, p2) => format!("{r} on [{p1}] and [{p2}]"),
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -509,7 +508,7 @@ fn deduplicate(
 
     deduplicate_h(d, &mut cache, &mut 0);
 
-    println!("{:?}", cache);
+    println!("{cache:?}");
     println!("{:?}", cache.values());
     let mut s = cache.drain().collect::<Vec<_>>();
 
@@ -526,7 +525,7 @@ fn dedup() {
     let e = parser::parse_judgement("a: *, b:*,c:*,d:* |- a -> b -> c->d : *").unwrap();
     let d = derive(e);
     let s = deduplicate(d);
-    println!("{:?}", s);
+    println!("{s:?}");
     panic!();
 }
 
@@ -536,7 +535,7 @@ fn deduplicate_h(d: Result<Derivation, DeriveError>, c: &mut DerivationCache, id
             let e = CacheEntry::Expr(d.conclusion.clone());
             c.entry(e).or_insert_with(|| {
                 let x = *id;
-                *id = *id + 1;
+                *id += 1;
                 (x, None)
             });
             let rule_ref = match (d.premiss_one, d.premiss_two) {
@@ -562,10 +561,10 @@ fn deduplicate_h(d: Result<Derivation, DeriveError>, c: &mut DerivationCache, id
             let e = CacheEntry::DeriveError(e);
             let x = c.entry(e).or_insert_with(|| {
                 let x = *id;
-                *id = *id + 1;
+                *id += 1;
                 (x, None)
             });
-            return x.0;
+            x.0
         }
     }
 }
@@ -595,14 +594,13 @@ pub fn derivation_html(s: &str) -> String {
                 }
                 CacheEntry::DeriveError(e) => {
                     format!(
-                        r#"<span class="id">[{}]</span> <span class="error">{}</span>"#,
-                        id, e
+                        r#"<span class="id">[{id}]</span> <span class="error">{e}</span>"#
                     )
                 }
             })
             .collect::<Vec<_>>()
             .join("\n"),
-        Err(e) => format!("<code>{}</code>", e),
+        Err(e) => format!("<code>{e}</code>"),
     }
 }
 

@@ -6,12 +6,12 @@ use pest::Parser;
 
 #[derive(pest_derive::Parser)]
 #[grammar = "grammar.pest"]
-pub struct CalculatorParser;
+pub struct LambdaCParser;
 
 lazy_static::lazy_static! {
     static ref PRATT_PARSER: PrattParser<Rule> = {
-        use pest::pratt_parser::{Assoc::*, Op};
-        use Rule::*;
+        use pest::pratt_parser::{Assoc::{Left, Right}, Op};
+        use Rule::{appl, arrow};
 
         // Precedence is defined lowest to highest
         PrattParser::new()
@@ -108,7 +108,6 @@ fn parse_expr(pairs: Pairs<Rule>) -> Expr {
                     etype,
                 }
             }
-            Rule::gamma => Expr::Star,
 
             rule => unreachable!("Expr::parse expected atom, found {:?}", rule),
         })
@@ -146,7 +145,7 @@ fn it_works() {
 
 pub fn stringify(e: Expr) -> String {
     match e {
-        Expr::Identifier(s) => s.to_string(),
+        Expr::Identifier(s) => s,
         Expr::Star => "∗".to_string(),
         Expr::Box => "□".to_string(),
         Expr::Bottom => "⊥".to_string(),
@@ -196,7 +195,7 @@ pub fn stringify(e: Expr) -> String {
                 .collect::<Vec<_>>()
                 // .join(",\n");
                 .join(", ");
-            if context == "" {
+            if context.is_empty() {
                 context = "∅".to_string();
             }
             format!(
@@ -223,7 +222,7 @@ pub fn htmlify(e: Expr) -> String {
                 .collect::<Vec<_>>()
                 // .join(",\n");
                 .join(", ");
-            if context == "" {
+            if context.is_empty() {
                 context = "∅".to_string();
             }
             format!(
@@ -256,7 +255,7 @@ fn e() {
 }
 
 pub fn parse_judgement(input: &str) -> Result<Expr, pest::error::Error<Rule>> {
-    match CalculatorParser::parse(Rule::judgement_program, &input) {
+    match LambdaCParser::parse(Rule::judgement_program, input) {
         Ok(mut pairs) => {
             let a = pairs
                 .next()
