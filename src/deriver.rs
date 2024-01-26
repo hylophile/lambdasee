@@ -60,6 +60,8 @@ enum DeriveError {
         "Form rule inferred (s1,s2) = ({0},{1}), but s1 and s2 can only be sorts (either ∗ or □)."
     )]
     InferForm(String, String),
+    #[error("Inferred type for judgement {0} was {2}, but {2} ≠ {1}.")]
+    InferJudgement(String, String, String),
 }
 
 fn append_to_context(ident: Expr, etype: Expr, context: Vec<Expr>) -> Vec<Expr> {
@@ -158,10 +160,20 @@ fn derive(judgement: Expr) -> Result<Derivation, DeriveError> {
             expr,
             etype,
         } => {
+            let inf_type = infer_type(context.to_vec(), *expr.clone())?;
+            if *etype != inf_type {
+                return Err(DeriveError::InferJudgement(
+                    parser::stringify(judgement),
+                    parser::stringify(*etype),
+                    parser::stringify(inf_type),
+                ));
+            }
+
             let context = context.as_slice();
             let judgement_expr = *expr;
             let judgement_type = *etype;
 
+            // Sort
             if let ([], Expr::Star, Expr::Box) = (context, &judgement_expr, &judgement_type) {
                 return Ok(Derivation {
                     rule: Rule::Sort,
@@ -280,9 +292,7 @@ fn derive(judgement: Expr) -> Result<Derivation, DeriveError> {
                 }
                 let p1_type = infer_type(context.to_vec(), *pi_type.clone());
                 if p1_type.clone().unwrap() != Expr::Star && p1_type.clone().unwrap() != Expr::Box {
-                    println!(
-                        "\n{judgement:?}\n\n{context:?}\n{pi_type:?}\n{p1_type:?}\n"
-                    );
+                    println!("\n{judgement:?}\n\n{context:?}\n{pi_type:?}\n{p1_type:?}\n");
                 }
                 let premiss_one = match p1_type.clone() {
                     Ok(t) => Some(Box::new(derive(Expr::Judgement {
@@ -593,9 +603,7 @@ pub fn derivation_html(s: &str) -> String {
                     )
                 }
                 CacheEntry::DeriveError(e) => {
-                    format!(
-                        r#"<span class="id">[{id}]</span> <span class="error">{e}</span>"#
-                    )
+                    format!(r#"<span class="id">[{id}]</span> <code class="error">{e}</code>"#)
                 }
             })
             .collect::<Vec<_>>()
