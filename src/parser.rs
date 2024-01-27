@@ -1,6 +1,7 @@
 extern crate pest;
 
 use std::borrow::Borrow;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 use pest::iterators::Pairs;
@@ -55,6 +56,83 @@ pub enum Expr {
     },
 }
 
+impl Expr {
+    pub fn new_pi(ident: Rc<Expr>, etype: Rc<Expr>, body: Rc<Expr>) -> Self {
+        let ident_name = match (*ident).borrow() {
+            Expr::Identifier(x) => x,
+            _ => unreachable!(),
+        };
+        let ident = if identifier_names(body.clone()).contains(ident_name) {
+            Some(Rc::new(Expr::Identifier(ident_name.to_string())))
+        } else {
+            None
+        };
+        Self::PiAbstraction {
+            ident,
+            etype: etype.clone(),
+            body: body.clone(),
+        }
+    }
+    // Expr::
+}
+
+#[test]
+fn idnames() {
+    let s = "S : ∗, P : S → ∗, A : ∗ |- (Πx : S . (A → P x)) → A → Πy : S . P y : *";
+    let j = parse_judgement(s).unwrap();
+    let mut ns = identifier_names(Rc::new(j));
+    let mut ns = ns.drain().collect::<Vec<_>>();
+    ns.sort();
+    assert_eq!(ns, vec!["A", "P", "S", "x", "y"]);
+}
+
+fn identifier_names_h(expr: Rc<Expr>, names: &mut HashSet<String>) {
+    match (*expr).borrow() {
+        Expr::Identifier(x) => {
+            names.insert(x.to_string());
+        }
+        Expr::Application { lhs, rhs } => {
+            identifier_names_h(lhs.clone(), names);
+            identifier_names_h(rhs.clone(), names);
+        }
+        Expr::LambdaAbstraction { ident, etype, body } => {
+            identifier_names_h(ident.clone(), names);
+            identifier_names_h(etype.clone(), names);
+            identifier_names_h(body.clone(), names);
+        }
+        Expr::PiAbstraction { ident, etype, body } => {
+            if let Some(ident) = ident {
+                identifier_names_h(ident.clone(), names);
+            }
+            identifier_names_h(etype.clone(), names);
+            identifier_names_h(body.clone(), names);
+        }
+        Expr::FreeVariable { ident, etype } => {
+            identifier_names_h(ident.clone(), names);
+            identifier_names_h(etype.clone(), names);
+        }
+        Expr::Judgement {
+            context,
+            expr,
+            etype,
+        } => {
+            for x in context {
+                identifier_names_h(Rc::new(x.clone()), names);
+            }
+            identifier_names_h(expr.clone(), names);
+            identifier_names_h(etype.clone(), names);
+        }
+        _ => (),
+    }
+}
+pub fn identifier_names(expr: Rc<Expr>) -> HashSet<String> {
+    let mut names = HashSet::new();
+
+    identifier_names_h(expr, &mut names);
+
+    names
+}
+
 fn parse_expr(pairs: Pairs<Rule>) -> Expr {
     PRATT_PARSER
         .map_primary(|primary| match primary.as_rule() {
@@ -78,11 +156,7 @@ fn parse_expr(pairs: Pairs<Rule>) -> Expr {
                 )));
                 let etype = Rc::new(parse_expr(inner.next().unwrap().into_inner()));
                 let body = Rc::new(parse_expr(inner.next().unwrap().into_inner()));
-                Expr::PiAbstraction {
-                    ident: Some(ident),
-                    etype,
-                    body,
-                }
+                Expr::new_pi(ident, etype, body)
             }
             Rule::expr => parse_expr(primary.into_inner()),
             Rule::ident => Expr::Identifier(primary.as_str().into()),
