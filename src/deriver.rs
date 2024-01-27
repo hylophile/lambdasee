@@ -93,7 +93,7 @@ fn find_type_in_context(ident: &Expr, context: &Vec<Expr>) -> Option<Rc<Expr>> {
     None
 }
 
-fn infer_type(context: Vec<Expr>, expr: Rc<Expr>) -> Result<Rc<Expr>, DeriveError> {
+fn infer_type(context: &Vec<Expr>, expr: Rc<Expr>) -> Result<Rc<Expr>, DeriveError> {
     match (*expr).borrow() {
         Expr::Identifier(_) => find_type_in_context(&expr, &context).ok_or(
             DeriveError::InferIdentifier(parser::stringify(expr), format!("{context:?}")),
@@ -101,7 +101,7 @@ fn infer_type(context: Vec<Expr>, expr: Rc<Expr>) -> Result<Rc<Expr>, DeriveErro
         Expr::Star => Ok(Rc::new(Expr::Box)),
         Expr::Box => Err(DeriveError::InferBox),
         Expr::Bottom => todo!(),
-        Expr::Application { lhs, rhs: _ } => match infer_type(context.clone(), lhs.clone()) {
+        Expr::Application { lhs, rhs: _ } => match infer_type(context, lhs.clone()) {
             Ok(r) => match (*r).borrow() {
                 Expr::PiAbstraction {
                     ident: _,
@@ -160,7 +160,7 @@ fn derive(judgement: Rc<Expr>) -> Result<Derivation, DeriveError> {
             expr,
             etype,
         } => {
-            let inf_type = infer_type(context.to_vec(), expr.clone())?;
+            let inf_type = infer_type(&context, expr.clone())?;
             if etype != inf_type {
                 return Err(DeriveError::InferJudgement(
                     parser::stringify(judgement),
@@ -169,13 +169,13 @@ fn derive(judgement: Rc<Expr>) -> Result<Derivation, DeriveError> {
                 ));
             }
 
-            let context = context.as_slice();
+            // let context = context.as_slice();
             let judgement_expr = expr;
             let judgement_type = etype;
 
             // Sort
             if let ([], Expr::Star, Expr::Box) = (
-                context,
+                context.as_slice(),
                 (*judgement_expr).borrow(),
                 (*judgement_type).borrow(),
             ) {
@@ -220,7 +220,7 @@ fn derive(judgement: Rc<Expr>) -> Result<Derivation, DeriveError> {
                         // };
 
                         // TODO x \not\in\ context
-                        let aa = infer_type(context.to_vec(), last_fv_type.clone());
+                        let aa = infer_type(&context, last_fv_type.clone());
                         let p1 = match aa {
                             Ok(t) => Some(Rc::new(derive(
                                 Expr::Judgement {
@@ -262,18 +262,17 @@ fn derive(judgement: Rc<Expr>) -> Result<Derivation, DeriveError> {
                                 .into(),
                             )));
 
-                            let premiss_two =
-                                match infer_type(context.to_vec(), last_fv_type.clone()) {
-                                    Ok(t) => Some(Rc::new(derive(
-                                        Expr::Judgement {
-                                            context: new_context,
-                                            expr: (last_fv_type.clone()),
-                                            etype: (t),
-                                        }
-                                        .into(),
-                                    ))),
-                                    Err(e) => Some(Rc::new(Err(e))),
-                                };
+                            let premiss_two = match infer_type(&context, last_fv_type.clone()) {
+                                Ok(t) => Some(Rc::new(derive(
+                                    Expr::Judgement {
+                                        context: new_context,
+                                        expr: (last_fv_type.clone()),
+                                        etype: (t),
+                                    }
+                                    .into(),
+                                ))),
+                                Err(e) => Some(Rc::new(Err(e))),
+                            };
 
                             return Ok(Derivation {
                                 rule: Rule::Weak,
@@ -303,7 +302,7 @@ fn derive(judgement: Rc<Expr>) -> Result<Derivation, DeriveError> {
                         parser::stringify(judgement),
                     ));
                 }
-                let p1_type = infer_type(context.to_vec(), pi_type.clone());
+                let p1_type = infer_type(&context, pi_type.clone());
 
                 let premiss_one = match p1_type.clone() {
                     Ok(t) => Some(Rc::new(derive(
@@ -362,8 +361,8 @@ fn derive(judgement: Rc<Expr>) -> Result<Derivation, DeriveError> {
                 // TODO B[x:=N] in reverse
                 // TODO new free variable "x"
 
-                let p1_type = infer_type(context.to_vec(), lhs.clone())?;
-                let p2_type = infer_type(context.to_vec(), rhs.clone())?;
+                let p1_type = infer_type(&context, lhs.clone())?;
+                let p2_type = infer_type(&context, rhs.clone())?;
                 // TODO check p1_type == piabstr && pitype == p2_type && pibody == pibody[x:=N]
 
                 // let p1_type = Expr::PiAbstraction {
@@ -716,7 +715,10 @@ pub fn derivation_html(d: &DedupedDerivationResult) -> String {
 fn derive_html() {
     let s ="a:*,b:*,S : ∗, Q : S → S → ∗ |- (Πx:S. /y : S . (Q x y → Q y x → (/a:*.a))) → Πz : S . (Q z z → (/b:*.b)) : *";
     let d = derivation(s);
-    derivation_html(&d);
+    let d = derivation(s);
+    let d = derivation(s);
+    let d = derivation(s);
+    // derivation_html(&d);
 }
 
 // a:*->*,b:*,m:a->b,n:a |- a b : *
