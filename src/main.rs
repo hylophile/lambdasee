@@ -9,9 +9,7 @@ use rocket::fs::FileServer;
 fn parse(query: &str) -> String {
     // deriver::derivation(query)
     match parser::parse_judgement(query) {
-        Ok(s) => {
-            parser::htmlify(s)
-        }
+        Ok(s) => parser::htmlify(s),
         Err(e) => format!("<code>{e}</code>"),
     }
 }
@@ -19,6 +17,8 @@ fn parse(query: &str) -> String {
 #[get("/derive?<query>")]
 fn derive(query: &str) -> String {
     // format!("{}", deriver::derivation(query))
+    let x = deriver::derivation_dot(query);
+    println!("{x}");
     deriver::derivation_html(query)
 }
 

@@ -291,9 +291,7 @@ fn derive(judgement: Expr) -> Result<Derivation, DeriveError> {
                     ));
                 }
                 let p1_type = infer_type(context.to_vec(), *pi_type.clone());
-                if p1_type.clone().unwrap() != Expr::Star && p1_type.clone().unwrap() != Expr::Box {
-                    println!("\n{judgement:?}\n\n{context:?}\n{pi_type:?}\n{p1_type:?}\n");
-                }
+
                 let premiss_one = match p1_type.clone() {
                     Ok(t) => Some(Box::new(derive(Expr::Judgement {
                         context: context.to_vec(),
@@ -518,8 +516,8 @@ fn deduplicate(
 
     deduplicate_h(d, &mut cache, &mut 0);
 
-    println!("{cache:?}");
-    println!("{:?}", cache.values());
+    // println!("{cache:?}");
+    // println!("{:?}", cache.values());
     let mut s = cache.drain().collect::<Vec<_>>();
 
     s.sort_unstable_by(|(_, v1), (_, v2)| v1.0.cmp(&v2.0));
@@ -589,6 +587,72 @@ fn deduplicate_h(d: Result<Derivation, DeriveError>, c: &mut DerivationCache, id
 //     }
 // }
 
+pub fn derivation_dot(s: &str) -> String {
+    match parser::parse_judgement(s) {
+        Ok(d) => {
+            let nodes = deduplicate(derive(d))
+                .iter()
+                .map(|(k, (id, ruleref))| match k {
+                    CacheEntry::Expr(e) => {
+                        let (rulename, refs) = match ruleref {
+                            Some(r) => match r {
+                                RuleRef::None(r) => (r, "".to_string()),
+                                RuleRef::One(r, ref1) => (r, format!("{} -> {};", id, ref1)),
+                                RuleRef::Two(r, ref1, ref2) => {
+                                    (r, format!("{} -> {};\n{} -> {};", id, ref1, id, ref2))
+                                }
+                            },
+                            None => todo!(),
+                        };
+                        let style = match rulename {
+                            Rule::Sort => "".to_string(),
+                            Rule::Var => "dotted".to_string(),
+                            Rule::Weak => "dotted".to_string(),
+                            Rule::Form(_, _) => "".to_string(),
+                            Rule::Appl => "".to_string(),
+                            Rule::Abst => "".to_string(),
+                            Rule::Conv => "".to_string(),
+                        };
+                        match e {
+                            Expr::Judgement {
+                                context,
+                                expr,
+                                etype,
+                            } => {
+                                format!(
+                                    "{} [label=<{{{}<br/>⊢<br/><font point-size=\"20\">{}</font><br/>:<br/>{}|{}}}> style=\"{}\"];\n{}",
+                                    // "{} [label=<{{{}<br/>⊤<br/><font point-size=\"20\">{}</font><br/>. .<br/>{}|{}}}> style=\"{}\"];\n{}",
+                                    // "{} [label=<{{{}<br/>⊤<br/><font point-size=\"20\">{}</font><br/>⊢· ·<br/>{}|{}}}> style=\"{}\"];\n{}",
+                                    // "{} [label=<{}|<b>{}</b>|{}|{}>];\n{}",
+                                    id,
+                                    context
+                                        .iter()
+                                        .cloned()
+                                        .map(|u| parser::stringify(u))
+                                        .collect::<Vec<_>>()
+                                        .join(",    "),
+                                    parser::stringify(*expr.clone()),
+                                    parser::stringify(*etype.clone()),
+                                    rulename,
+                                    style,
+                                    refs
+                                )
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
+                    CacheEntry::DeriveError(e) => {
+                        format!(r#"[{id}]{e}"#)
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            format!("digraph derivation_tree {{\nnode [shape=Mrecord, style=rounded]\n{nodes}\n}}")
+        }
+        Err(e) => format!("{e}"),
+    }
+}
+
 pub fn derivation_html(s: &str) -> String {
     match parser::parse_judgement(s) {
         Ok(d) => deduplicate(derive(d))
@@ -612,5 +676,13 @@ pub fn derivation_html(s: &str) -> String {
     }
 }
 
+#[test]
+fn derive_html() {
+    let s ="a:*,b:*,S : ∗, Q : S → S → ∗ |- (Πx:S. /y : S . (Q x y → Q y x → (/a:*.a))) → Πz : S . (Q z z → (/b:*.b)) : *";
+    derivation_html(s);
+}
+
 // a:*->*,b:*,m:a->b,n:a |- a b : *
 // a:*,b:*,x:a,y:a->b |- (/x:c.(y x)) :*   panic
+// S : ∗, P : S → ∗, A : ∗ |- (Πx : S . (A → P x)) → A → Πy : S . P y : *
+// a:*,b:*,S : ∗, Q : S → S → ∗ |- (Πx:S. /y : S . (Q x y → Q y x → (/a:*.a))) → Πz : S . (Q z z → (/b:*.b)) : *
