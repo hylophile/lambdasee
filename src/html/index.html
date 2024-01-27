@@ -4,81 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>lambdasee</title>
-    <script src="htmx.js"></script>
-    <script src="prism.js"></script>
-    <script src="https://unpkg.com/@svgdotjs/svg.js"></script>
-    <script src="https://unpkg.com/@svgdotjs/svg.panzoom.js"></script>
+    <script src="vendor/htmx.js"></script>
+    <script src="vendor/prism.js"></script>
+    <script src="vendor/svg.js"></script>
+    <script src="vendor/svg.panzoom.js"></script>
+    <link rel="stylesheet" href="vendor/prism.css" />
 
-    <link rel="stylesheet" href="prism.css" />
-    <style>
-            #derive-result {
-              display: grid;
-              grid-template-columns: max-content max-content 3em max-content 3em max-content max-content;
-             }
-           .rule {
-             text-align: left;
-             margin-left: 1em;
-           }
-         .id {
-           text-align: right !important;
-           margin-right: 1em;
-         }
-       #graph-result {
-         width: 100%;
-         height:auto;
-       }
-      svg {
-
-         border: 1px solid slategray;
-      }
-          .expr, .turnstile, .type-symbol, .error {
-            text-align: center !important;
-          }
-                html {
-                  font-size: 18px;
-                  font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
-                  color: #16191c;
-                }
-                body {
-                  margin: 10rem;
-                }
-                label,
-                input,
-                button {
-                  font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
-                }
-                button {
-                  font-size: 18px;
-                }
-                span[role="textbox"] {
-                  font-size: 1rem;
-                  border: 1px solid slategray;
-                  margin 1em 0;
-                  padding: 0.5em;
-                }
-                .flex {
-                  display: flex;
-                  flex-direction: column;
-                }
-               .float {
-                 position: absolute;
-                 right: 1em;
-                 top: 1em;
-                 border: 1px solid slategray;
-               }
-               .grid-container {
-                 display: grid;
-                 grid-template-columns: repeat(2, 1fr);
-               }
-               .grid-item {
-                 text-align: center;
-             }
-        .error {
-          grid-column: span 6;
-          padding: 0 1em;
-          background-color: rgba(255, 0, 0, 0.1) !important;
-        }
-    </style>
+    <link rel="stylesheet" href="index.css" />
+    <script type="module" src="index.js"></script>
   </head>
   <body>
     <fieldset class="float">
@@ -112,103 +45,7 @@
         <div class="grid-item">_|_</div>
       </div>
     </fieldset>
-
-    <script type="module">
-      const result = document.querySelector("#parse-result");
-      const deriveResult = document.querySelector("#derive-result");
-      const graphResult = document.querySelector("#graph-result");
-      const queryInput = document.querySelector("#query");
-
-      result.addEventListener("htmx:afterSwap", () => {
-        deriveResult.innerHTML = "";
-        Prism.highlightAll();
-      });
-
-      document.addEventListener("htmx:responseError", (e) => {
-        e.detail.target.innerHTML = "TODO: server panic.";
-      });
-
-      deriveResult.addEventListener("htmx:afterSwap", () => {
-        Prism.highlightAll();
-      });
-
-      graphResult.addEventListener("htmx:afterSwap", () => {
-        scaleToFit();
-      });
-
-      queryInput.addEventListener("input", () => {
-        window.location.replace(
-          "#query=" + btoa(encodeURIComponent(queryInput.innerText)),
-        );
-      });
-
-      window.addEventListener("load", () => {
-        const hashValue = window.location.hash.substring(1);
-        const encodedValue = hashValue.split("=")[1];
-
-        if (encodedValue) {
-          queryInput.innerText = decodeURIComponent(atob(encodedValue));
-          queryInput.dispatchEvent(new Event("input"));
-        }
-      });
-
-      window.normalize = (s) => s.replaceAll("\u{a0}", " ");
-
-      const scaleToFit = () => {
-        // Assuming you have an SVG element with the id "mySvg"
-        var svg = SVG(document.querySelector("svg"));
-
-        var visibleWidth = window.innerWidth;
-        var visibleHeight = window.innerHeight;
-
-        var svgWidth = svg.node.clientWidth;
-        var svgHeight = svg.node.clientHeight;
-
-        var scaleX = visibleWidth / svgWidth;
-        var scaleY = visibleHeight / svgHeight;
-        var scale = Math.min(scaleX, scaleY);
-
-        // Apply scaling transformation
-        svg.panZoom({ zoomFactor: 0.2 });
-        // svg.scale(scale);
-        svg.size(graphResult.clientWidth);
-        window.svg = svg;
-
-        graphResult.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-          inline: "nearest",
-        });
-        // .viewbox('0 0 1000 1000')
-      };
-
-      const legacyFormat = () => {
-        let x =
-          "a : ∗, b : ∗, c : ∗, d : ∗ ⊢ (a → (b → (c → d))) : ∗ (0, Some(Two(Form, 1, 9)))\na : ∗, b : ∗, c : ∗, d : ∗ ⊢ a : ∗ (1, Some(Two(Weak, 2, 8)))\na : ∗, b : ∗, c : ∗ ⊢ a : ∗ (2, Some(Two(Weak, 3, 7)))\na : ∗, b : ∗ ⊢ a : ∗ (3, Some(Two(Weak, 4, 6)))\na : ∗ ⊢ a : ∗ (4, Some(One(Var, 5)))\n∅ ⊢ ∗ : □ (5, None)\na : ∗ ⊢ ∗ : □ (6, Some(Two(Weak, 5, 5)))\na : ∗, b : ∗ ⊢ ∗ : □ (7, Some(Two(Weak, 6, 6)))\na : ∗, b : ∗, c : ∗ ⊢ ∗ : □ (8, Some(Two(Weak, 7, 7)))\na : ∗, b : ∗, c : ∗, d : ∗, _ : a ⊢ (b → (c → d)) : ∗ (9, Some(Two(Form, 10, 14)))\na : ∗, b : ∗, c : ∗, d : ∗, _ : a ⊢ b : ∗ (10, Some(Two(Weak, 11, 1)))\na : ∗, b : ∗, c : ∗, d : ∗ ⊢ b : ∗ (11, Some(Two(Weak, 12, 8)))\na : ∗, b : ∗, c : ∗ ⊢ b : ∗ (12, Some(Two(Weak, 13, 7)))\na : ∗, b : ∗ ⊢ b : ∗ (13, Some(One(Var, 6)))\na : ∗, b : ∗, c : ∗, d : ∗, _ : a, _ : b ⊢ (c → d) : ∗ (14, Some(Two(Form, 15, 19)))\na : ∗, b : ∗, c : ∗, d : ∗, _ : a, _ : b ⊢ c : ∗ (15, Some(Two(Weak, 16, 10)))\na : ∗, b : ∗, c : ∗, d : ∗, _ : a ⊢ c : ∗ (16, Some(Two(Weak, 17, 1)))\na : ∗, b : ∗, c : ∗, d : ∗ ⊢ c : ∗ (17, Some(Two(Weak, 18, 8)))\na : ∗, b : ∗, c : ∗ ⊢ c : ∗ (18, Some(One(Var, 7)))\na : ∗, b : ∗, c : ∗, d : ∗, _ : a, _ : b, _ : c ⊢ d : ∗ (19, Some(Two(Weak, 20, 15)))\na : ∗, b : ∗, c : ∗, d : ∗, _ : a, _ : b ⊢ d : ∗ (20, Some(Two(Weak, 21, 10)))\na : ∗, b : ∗, c : ∗, d : ∗, _ : a ⊢ d : ∗ (21, Some(Two(Weak, 22, 1)))\na : ∗, b : ∗, c : ∗, d : ∗ ⊢ d : ∗ (22, Some(One(Var, 8)))";
-
-        const d = (s) => {
-          let [c, et] = s.split("⊢");
-          let lastIndex = et.lastIndexOf(":");
-          let e = et.substring(0, lastIndex);
-          let t = et.substring(lastIndex + 1);
-          return [c, e, t];
-        };
-        let z = x.split("\n").map(d);
-
-        let cmax = Math.max(...z.map(([c, e, t]) => c.length));
-        let emax = Math.max(...z.map(([c, e, t]) => e.length));
-        let tmax = Math.max(...z.map(([c, e, t]) => t.length));
-
-        let q = z
-          .map(([c, e, t]) => {
-            return `${c.padEnd(cmax)}⊢${e.padEnd(emax)}:${t.padEnd(tmax)}`;
-          })
-          .join("\n");
-
-        deriveResult.innerHTML = q;
-      };
-    </script>
-    <div class="flex">
+    <main class="flex">
       <h1 style="margin: 0 auto">λ•</h1>
       <span style="margin: 0 auto">
         parse, visualize, and (soon™) derive expressions of λC & friends
@@ -259,8 +96,8 @@
         >
           <code></code>
         </pre>
-        <div id="graph-result"></div>
       </div>
-    </div>
+    </main>
+    <div id="graph-result"></div>
   </body>
 </html>

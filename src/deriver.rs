@@ -633,9 +633,9 @@ pub fn derivation_dot(d: &DedupedDerivationResult) -> String {
                         let (rulename, refs) = match ruleref {
                             Some(r) => match r {
                                 RuleRef::None(r) => (r, "".to_string()),
-                                RuleRef::One(r, ref1) => (r, format!("{} -> {};", id, ref1)),
+                                RuleRef::One(r, ref1) => (r, format!("{} -> {};", ref1,id )),
                                 RuleRef::Two(r, ref1, ref2) => {
-                                    (r, format!("{} -> {};\n{} -> {};", id, ref1, id, ref2))
+                                    (r, format!("{} -> {};\n{} -> {};", ref1, id, ref2, id))
                                 }
                             },
                             None => todo!(),
@@ -683,7 +683,7 @@ pub fn derivation_dot(d: &DedupedDerivationResult) -> String {
                 })
                 .collect::<Vec<_>>()
                 .join("\n");
-            format!("digraph derivation_tree {{\nfontname=\"Helvetica-14\"\nnode [shape=Mrecord, style=rounded]\n{nodes}\n}}")
+            format!("digraph derivation_tree {{\nfontname=\"Helvetica-14\"\nrankdir=BT\nnode [shape=Mrecord, style=rounded]\n{nodes}\n}}")
         }
         Err(e) => format!("{e}"),
     }
