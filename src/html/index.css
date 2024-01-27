@@ -63,11 +63,12 @@ main {
   margin-left: auto;
   margin-right: auto;
   margin-bottom: 0;
-  width: 100ch;
+  width: calc(100% - 22em);
 }
 .float {
   position: absolute;
-  left: calc(50% + 40ch + 7em);
+  /* left: calc(50% + 40ch + 7em); */
+  right: 1em;
   top: 1em;
   border: 1px solid slategray;
 }

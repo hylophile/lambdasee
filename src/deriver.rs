@@ -65,6 +65,8 @@ pub enum DeriveError {
     InferForm(String, String),
     #[error("Inferred type for judgement {0} was {2}, but {2} ≠ {1}.")]
     InferJudgement(String, String, String),
+    #[error("infer error")]
+    InferError,
 }
 
 fn append_to_context(ident: Rc<Expr>, etype: Rc<Expr>, context: Vec<Expr>) -> Vec<Expr> {
@@ -400,6 +402,53 @@ fn derive(judgement: Rc<Expr>) -> Result<Derivation, DeriveError> {
                     premiss_two: p2,
                 });
             }
+
+            if let Expr::LambdaAbstraction {
+                ident: lambda_ident,
+                etype: lambda_ident_type,
+                body: lambda_body,
+            } = (*judgement_expr).borrow()
+            {
+                let p1_body = lambda_body;
+                let p1_type = match (*judgement_type).borrow() {
+                    Expr::PiAbstraction { ident, etype, body } => Ok(body),
+                    _ => Err(DeriveError::InferError),
+                }?;
+                let p1_new_fv = lambda_ident;
+                let p1_new_fv_type = lambda_ident_type;
+                let p1_new_context =
+                    append_to_context(p1_new_fv.clone(), p1_new_fv_type.clone(), context.clone());
+                let p1 = Some(Rc::new(derive(
+                    Expr::Judgement {
+                        context: p1_new_context,
+                        expr: p1_body.clone(),
+                        etype: p1_type.clone(),
+                    }
+                    .into(),
+                )));
+
+                let s = (infer_type(&context, judgement_type.clone()))?;
+                let p2 = Some(Rc::new(derive(
+                    Expr::Judgement {
+                        context: context.clone(),
+                        expr: judgement_type.clone(),
+                        etype: s,
+                    }
+                    .into(),
+                )));
+
+                return Ok(Derivation {
+                    rule: Rule::Abst,
+                    conclusion: Expr::Judgement {
+                        context: context.to_vec(),
+                        expr: (judgement_expr),
+                        etype: (judgement_type),
+                    },
+                    premiss_one: p1,
+                    premiss_two: p2,
+                });
+            }
+
             Err(DeriveError::NotImplemented(parser::stringify(judgement)))
             // panic!(
             //     "ctx:  {:?}\nexpr: {:?}\ntype: {:?}",
