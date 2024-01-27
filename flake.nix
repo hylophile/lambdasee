@@ -18,6 +18,7 @@
         rustToolchain = pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile
           ./rust-toolchain.toml;
       in with pkgs; {
-        devShells.default = mkShell { buildInputs = [ rustToolchain ]; };
+        devShells.default =
+          mkShell { buildInputs = [ rustToolchain graphviz ]; };
       });
 }

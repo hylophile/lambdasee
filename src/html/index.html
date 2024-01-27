@@ -6,67 +6,78 @@
     <title>lambdasee</title>
     <script src="htmx.js"></script>
     <script src="prism.js"></script>
+    <script src="https://unpkg.com/@svgdotjs/svg.js"></script>
+    <script src="https://unpkg.com/@svgdotjs/svg.panzoom.js"></script>
+
     <link rel="stylesheet" href="prism.css" />
     <style>
-          #derive-result {
-            display: grid;
-            grid-template-columns: max-content max-content 3em max-content 3em max-content max-content;
+            #derive-result {
+              display: grid;
+              grid-template-columns: max-content max-content 3em max-content 3em max-content max-content;
+             }
+           .rule {
+             text-align: left;
+             margin-left: 1em;
            }
-         .rule {
-           text-align: left;
-           margin-left: 1em;
+         .id {
+           text-align: right !important;
+           margin-right: 1em;
          }
-       .id {
-         text-align: right !important;
-         margin-right: 1em;
+       #graph-result {
+         width: 100%;
+         height:auto;
        }
-        .expr, .turnstile, .type-symbol, .error {
-          text-align: center !important;
-        }
-              html {
-                font-size: 18px;
-                font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
-                color: #16191c;
-              }
-              body {
-                margin: 10rem;
-              }
-              label,
-              input,
-              button {
-                font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
-              }
-              button {
-                font-size: 18px;
-              }
-              span[role="textbox"] {
-                font-size: 1rem;
-                border: 1px solid slategray;
-                margin 1em 0;
-                padding: 0.5em;
-              }
-              .flex {
-                display: flex;
-                flex-direction: column;
-              }
-             .float {
-               position: fixed;
-               right: 1em;
-               top: 1em;
-               border: 1px solid slategray;
-             }
-             .grid-container {
-               display: grid;
-               grid-template-columns: repeat(2, 1fr);
-             }
-             .grid-item {
-               text-align: center;
-           }
-      .error {
-        grid-column: span 6;
-        padding: 0 1em;
-        background-color: rgba(255, 0, 0, 0.1) !important;
+      svg {
+
+         border: 1px solid slategray;
       }
+          .expr, .turnstile, .type-symbol, .error {
+            text-align: center !important;
+          }
+                html {
+                  font-size: 18px;
+                  font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
+                  color: #16191c;
+                }
+                body {
+                  margin: 10rem;
+                }
+                label,
+                input,
+                button {
+                  font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
+                }
+                button {
+                  font-size: 18px;
+                }
+                span[role="textbox"] {
+                  font-size: 1rem;
+                  border: 1px solid slategray;
+                  margin 1em 0;
+                  padding: 0.5em;
+                }
+                .flex {
+                  display: flex;
+                  flex-direction: column;
+                }
+               .float {
+                 position: absolute;
+                 right: 1em;
+                 top: 1em;
+                 border: 1px solid slategray;
+               }
+               .grid-container {
+                 display: grid;
+                 grid-template-columns: repeat(2, 1fr);
+               }
+               .grid-item {
+                 text-align: center;
+             }
+        .error {
+          grid-column: span 6;
+          padding: 0 1em;
+          background-color: rgba(255, 0, 0, 0.1) !important;
+        }
     </style>
   </head>
   <body>
@@ -105,6 +116,7 @@
     <script type="module">
       const result = document.querySelector("#parse-result");
       const deriveResult = document.querySelector("#derive-result");
+      const graphResult = document.querySelector("#graph-result");
       const queryInput = document.querySelector("#query");
 
       result.addEventListener("htmx:afterSwap", () => {
@@ -118,6 +130,10 @@
 
       deriveResult.addEventListener("htmx:afterSwap", () => {
         Prism.highlightAll();
+      });
+
+      graphResult.addEventListener("htmx:afterSwap", () => {
+        scaleToFit();
       });
 
       queryInput.addEventListener("input", () => {
@@ -137,6 +153,34 @@
       });
 
       window.normalize = (s) => s.replaceAll("\u{a0}", " ");
+
+      const scaleToFit = () => {
+        // Assuming you have an SVG element with the id "mySvg"
+        var svg = SVG(document.querySelector("svg"));
+
+        var visibleWidth = window.innerWidth;
+        var visibleHeight = window.innerHeight;
+
+        var svgWidth = svg.node.clientWidth;
+        var svgHeight = svg.node.clientHeight;
+
+        var scaleX = visibleWidth / svgWidth;
+        var scaleY = visibleHeight / svgHeight;
+        var scale = Math.min(scaleX, scaleY);
+
+        // Apply scaling transformation
+        svg.panZoom({ zoomFactor: 0.2 });
+        // svg.scale(scale);
+        svg.size(graphResult.clientWidth);
+        window.svg = svg;
+
+        graphResult.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+          inline: "nearest",
+        });
+        // .viewbox('0 0 1000 1000')
+      };
 
       const legacyFormat = () => {
         let x =
@@ -201,12 +245,21 @@
         >
           Derive
         </button>
+        <button
+          id="graph-query"
+          hx-get="/graph"
+          hx-vals="js: query:normalize(htmx.find('#query').innerText)"
+          hx-target="#graph-result"
+        >
+          Graph
+        </button>
         <pre
           id="derive-result"
           class="language-lisp rainbow-braces match-braces"
         >
           <code></code>
         </pre>
+        <div id="graph-result"></div>
       </div>
     </div>
   </body>

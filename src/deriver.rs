@@ -656,7 +656,8 @@ pub fn derivation_dot(d: &DedupedDerivationResult) -> String {
                                 etype,
                             } => {
                                 format!(
-                                    "{} [label=<{{{}<br/>⊢<br/><font point-size=\"20\">{}</font><br/>:<br/>{}|{}}}> style=\"{}\"];\n{}",
+                                    // "{} [label=<{{{}<br/>⊢<br/><font point-size=\"20\">{}</font><br/>:<br/>{}|{}}}> style=\"{}\"];\n{}",
+                                    "{} [label=<{{{}<br/>⊤<br/><font point-size=\"20\">{}</font><br/>··<br/>{}|{}}}> style=\"{}\"];\n{}",
                                     // "{} [label=<{{{}<br/>⊤<br/><font point-size=\"20\">{}</font><br/>. .<br/>{}|{}}}> style=\"{}\"];\n{}",
                                     // "{} [label=<{{{}<br/>⊤<br/><font point-size=\"20\">{}</font><br/>⊢· ·<br/>{}|{}}}> style=\"{}\"];\n{}",
                                     // "{} [label=<{}|<b>{}</b>|{}|{}>];\n{}",
@@ -682,7 +683,7 @@ pub fn derivation_dot(d: &DedupedDerivationResult) -> String {
                 })
                 .collect::<Vec<_>>()
                 .join("\n");
-            format!("digraph derivation_tree {{\nnode [shape=Mrecord, style=rounded]\n{nodes}\n}}")
+            format!("digraph derivation_tree {{\nfontname=\"Helvetica-14\"\nnode [shape=Mrecord, style=rounded]\n{nodes}\n}}")
         }
         Err(e) => format!("{e}"),
     }
