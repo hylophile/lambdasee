@@ -23,6 +23,7 @@ svg {
 .expr,
 .turnstile,
 .type-symbol,
+.type,
 .error {
   text-align: center !important;
 }
