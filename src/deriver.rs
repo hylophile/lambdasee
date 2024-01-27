@@ -1,13 +1,13 @@
 use std::{
     borrow::Borrow,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     error,
     fmt::{self},
     rc::Rc,
 };
 use thiserror::Error;
 
-use crate::parser::{self, Expr};
+use crate::parser::{self, Expr, identifier_names};
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub enum Rule {
@@ -117,23 +117,22 @@ fn infer_type(context: &Vec<Expr>, expr: Rc<Expr>) -> Result<Rc<Expr>, DeriveErr
             },
             Err(e) => Err(e),
         },
-        Expr::LambdaAbstraction {
-            ident: _,
-            etype,
-            body,
-        } => match infer_type(context, body.clone()) {
-            Ok(body) => Ok(Rc::new(Expr::PiAbstraction {
-                ident: None,
-                etype: etype.clone(),
-                body: body.clone(),
-            })),
-            err => err,
-        },
-        Expr::PiAbstraction {
-            ident: _,
-            etype: _,
-            body,
-        } => infer_type(context, body.clone()),
+        Expr::LambdaAbstraction { ident, etype, body } => {
+            let new_context = append_to_context(ident.clone(), etype.clone(), context.clone());
+            match infer_type(&new_context, body.clone()) {
+                Ok(body) => Ok(Rc::new(Expr::new_pi(ident.clone(), etype.clone(), body))),
+
+                err => err,
+            }
+        }
+        Expr::PiAbstraction { ident, etype, body } => {
+            let new_context = if let Some(ident) = ident {
+                append_to_context(ident.clone(), etype.clone(), context.clone())
+            } else {
+                context.clone()
+            };
+            infer_type(&new_context, body.clone())
+        }
         _ => unreachable!(),
     }
 }
