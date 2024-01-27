@@ -1,5 +1,8 @@
 extern crate pest;
 
+use std::borrow::Borrow;
+use std::rc::Rc;
+
 use pest::iterators::Pairs;
 use pest::pratt_parser::PrattParser;
 use pest::Parser;
@@ -28,27 +31,27 @@ pub enum Expr {
     Box,
     Bottom,
     Application {
-        lhs: Box<Expr>,
-        rhs: Box<Expr>,
+        lhs: Rc<Expr>,
+        rhs: Rc<Expr>,
     },
     LambdaAbstraction {
-        ident: Box<Expr>,
-        etype: Box<Expr>,
-        body: Box<Expr>,
+        ident: Rc<Expr>,
+        etype: Rc<Expr>,
+        body: Rc<Expr>,
     },
     PiAbstraction {
-        ident: Option<Box<Expr>>,
-        etype: Box<Expr>,
-        body: Box<Expr>,
+        ident: Option<Rc<Expr>>,
+        etype: Rc<Expr>,
+        body: Rc<Expr>,
     },
     FreeVariable {
-        ident: Box<Expr>,
-        etype: Box<Expr>,
+        ident: Rc<Expr>,
+        etype: Rc<Expr>,
     },
     Judgement {
         context: Vec<Expr>,
-        expr: Box<Expr>,
-        etype: Box<Expr>,
+        expr: Rc<Expr>,
+        etype: Rc<Expr>,
     },
 }
 
@@ -61,20 +64,20 @@ fn parse_expr(pairs: Pairs<Rule>) -> Expr {
             Rule::bottom => Expr::Bottom,
             Rule::lambda => {
                 let mut inner = primary.into_inner();
-                let ident = Box::new(parse_expr(pest::iterators::Pairs::single(
+                let ident = Rc::new(parse_expr(pest::iterators::Pairs::single(
                     inner.next().unwrap(),
                 )));
-                let etype = Box::new(parse_expr(inner.next().unwrap().into_inner()));
-                let body = Box::new(parse_expr(inner.next().unwrap().into_inner()));
+                let etype = Rc::new(parse_expr(inner.next().unwrap().into_inner()));
+                let body = Rc::new(parse_expr(inner.next().unwrap().into_inner()));
                 Expr::LambdaAbstraction { ident, etype, body }
             }
             Rule::pi => {
                 let mut inner = primary.into_inner();
-                let ident = Box::new(parse_expr(pest::iterators::Pairs::single(
+                let ident = Rc::new(parse_expr(pest::iterators::Pairs::single(
                     inner.next().unwrap(),
                 )));
-                let etype = Box::new(parse_expr(inner.next().unwrap().into_inner()));
-                let body = Box::new(parse_expr(inner.next().unwrap().into_inner()));
+                let etype = Rc::new(parse_expr(inner.next().unwrap().into_inner()));
+                let body = Rc::new(parse_expr(inner.next().unwrap().into_inner()));
                 Expr::PiAbstraction {
                     ident: Some(ident),
                     etype,
@@ -85,10 +88,10 @@ fn parse_expr(pairs: Pairs<Rule>) -> Expr {
             Rule::ident => Expr::Identifier(primary.as_str().into()),
             Rule::free_var => {
                 let mut inner = primary.into_inner();
-                let ident = Box::new(parse_expr(pest::iterators::Pairs::single(
+                let ident = Rc::new(parse_expr(pest::iterators::Pairs::single(
                     inner.next().unwrap(),
                 )));
-                let etype = Box::new(parse_expr(inner.next().unwrap().into_inner()));
+                let etype = Rc::new(parse_expr(inner.next().unwrap().into_inner()));
                 Expr::FreeVariable { ident, etype }
             }
             Rule::judgement => {
@@ -99,8 +102,8 @@ fn parse_expr(pairs: Pairs<Rule>) -> Expr {
                     .map(|pair| parse_expr(Pairs::single(pair)))
                     .collect();
 
-                let expr = Box::new(parse_expr(inner.next().unwrap().into_inner()));
-                let etype = Box::new(parse_expr(inner.next().unwrap().into_inner()));
+                let expr = Rc::new(parse_expr(inner.next().unwrap().into_inner()));
+                let etype = Rc::new(parse_expr(inner.next().unwrap().into_inner()));
 
                 Expr::Judgement {
                     context,
@@ -115,13 +118,13 @@ fn parse_expr(pairs: Pairs<Rule>) -> Expr {
         .map_infix(|lhs, op, rhs| match op.as_rule() {
             Rule::arrow => {
                 let ident = None;
-                let etype = Box::new(lhs);
-                let body = Box::new(rhs);
+                let etype = Rc::new(lhs);
+                let body = Rc::new(rhs);
                 Expr::PiAbstraction { ident, etype, body }
             }
             Rule::appl => Expr::Application {
-                lhs: Box::new(lhs),
-                rhs: Box::new(rhs),
+                lhs: Rc::new(lhs),
+                rhs: Rc::new(rhs),
             },
             rule => unreachable!("Expr::parse expected infix operation, found {:?}", rule),
         })
@@ -143,46 +146,58 @@ fn it_works() {
     // panic!();
 }
 
-pub fn stringify(e: Expr) -> String {
-    match e {
-        Expr::Identifier(s) => s,
+pub fn stringify(e: Rc<Expr>) -> String {
+    match (*e).borrow() {
+        Expr::Identifier(s) => s.to_string(),
         Expr::Star => "∗".to_string(),
         Expr::Box => "□".to_string(),
         Expr::Bottom => "⊥".to_string(),
         Expr::Application { lhs, rhs } => {
-            format!("({} {})", stringify(*lhs), stringify(*rhs))
+            format!("({} {})", stringify(lhs.clone()), stringify(rhs.clone()))
         }
         Expr::LambdaAbstraction { ident, etype, body } => {
             format!(
                 "(λ{} : {} . {})",
-                stringify(*ident),
-                stringify(*etype),
-                stringify(*body)
+                stringify(ident.clone()),
+                stringify(etype.clone()),
+                stringify(body.clone())
             )
         }
         Expr::PiAbstraction { ident, etype, body } => match ident {
             Some(i) => {
                 format!(
                     "(Π{} : {} . {})",
-                    stringify(*i),
-                    stringify(*etype),
-                    stringify(*body)
+                    stringify(i.clone()),
+                    stringify(etype.clone()),
+                    stringify(body.clone())
                 )
             }
             None => {
-                match (&*etype, &*body) {
+                match ((*etype).borrow(), (*body).borrow()) {
                     (Expr::Identifier(s1), Expr::Identifier(s2)) => format!("({s1} → {s2})"),
                     (Expr::Star | Expr::Box, Expr::Star | Expr::Box) => {
-                        format!("({} → {})", stringify(*etype), stringify(*body))
+                        format!(
+                            "({} → {})",
+                            stringify(etype.clone()),
+                            stringify(body.clone())
+                        )
                     }
-                    _ => format!("({} → {})", stringify(*etype), stringify(*body)),
+                    _ => format!(
+                        "({} → {})",
+                        stringify(etype.clone()),
+                        stringify(body.clone())
+                    ),
                 }
 
                 // format!("{} → {}", f(*etype), x)
             }
         },
         Expr::FreeVariable { ident, etype } => {
-            format!("{} : {}", stringify(*ident), stringify(*etype))
+            format!(
+                "{} : {}",
+                stringify(ident.clone()),
+                stringify(etype.clone())
+            )
         }
         Expr::Judgement {
             context,
@@ -191,7 +206,7 @@ pub fn stringify(e: Expr) -> String {
         } => {
             let mut context = context
                 .iter()
-                .map(|e| stringify((*e).clone()))
+                .map(|e| stringify(Rc::new(e.clone())))
                 .collect::<Vec<_>>()
                 // .join(",\n");
                 .join(", ");
@@ -202,8 +217,8 @@ pub fn stringify(e: Expr) -> String {
                 // "{} \n\n⊢ {} \n\n: {}",
                 "{} ⊢ {} : {}",
                 context,
-                stringify(*expr),
-                stringify(*etype)
+                stringify(expr.clone()),
+                stringify(etype.clone())
             )
         }
     }
@@ -218,7 +233,7 @@ pub fn htmlify(e: Expr) -> String {
         } => {
             let mut context = context
                 .iter()
-                .map(|e| stringify((*e).clone()))
+                .map(|e| stringify(Rc::new(e.clone())))
                 .collect::<Vec<_>>()
                 // .join(",\n");
                 .join(", ");
@@ -228,31 +243,31 @@ pub fn htmlify(e: Expr) -> String {
             format!(
                 r#"<code class="context">{}</code><code class="turnstile"> ⊢ </code><code class="expr">{}</code><code class="type-symbol"> : </code><code class="type">{}</code>"#,
                 (context),
-                stringify(*expr),
-                stringify(*etype)
+                stringify(expr),
+                stringify(etype)
             )
         }
-        _ => stringify(e),
+        _ => stringify(Rc::new(e)),
     }
 }
 
-#[test]
-fn e() {
-    let line = "a:b⊢a : (b)";
-    assert_eq!("a : b ⊢ a : b", stringify(parse_judgement(line).unwrap()));
+// #[test]
+// fn e() {
+//     let line = "a:b⊢a : (b)";
+//     assert_eq!("a : b ⊢ a : b", stringify(parse_judgement(line).unwrap()));
 
-    let _line = "C ⊢ λα : ∗ . λβ : (∗ → ∗) . a b β(β α) : ∗ → (∗ → ∗) → ∗";
-    let _line = "C ⊢ λα : ∗ . λβ : (∗ → ∗) . a b β(β α) : ∗ → ∗ → ∗ → ∗";
-    let line = "C |- (Πx : S . (A → P x)) → A → Πy : S . P y : kp";
-    // let line = "C |- (Πx : S . (A → P x)) : p";
-    // let line = "C |- A → P x : p";
-    // let line = "C ⊢ a : ∗ → (∗ → ∗) → ∗";
-    // let line = "C ⊢ a : a -> (* -> b) -> d";
-    let r = parse_judgement(line).unwrap();
-    println!("{r:#?}");
-    assert_eq!("a : b ⊢ a : b", stringify(r));
-    panic!();
-}
+//     let _line = "C ⊢ λα : ∗ . λβ : (∗ → ∗) . a b β(β α) : ∗ → (∗ → ∗) → ∗";
+//     let _line = "C ⊢ λα : ∗ . λβ : (∗ → ∗) . a b β(β α) : ∗ → ∗ → ∗ → ∗";
+//     let line = "C |- (Πx : S . (A → P x)) → A → Πy : S . P y : kp";
+//     // let line = "C |- (Πx : S . (A → P x)) : p";
+//     // let line = "C |- A → P x : p";
+//     // let line = "C ⊢ a : ∗ → (∗ → ∗) → ∗";
+//     // let line = "C ⊢ a : a -> (* -> b) -> d";
+//     let r = parse_judgement(line).unwrap();
+//     println!("{r:#?}");
+//     assert_eq!("a : b ⊢ a : b", stringify(r));
+//     panic!();
+// }
 
 pub fn parse_judgement(input: &str) -> Result<Expr, pest::error::Error<Rule>> {
     match LambdaCParser::parse(Rule::judgement_program, input) {

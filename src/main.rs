@@ -16,10 +16,10 @@ fn parse(query: &str) -> String {
 
 #[get("/derive?<query>")]
 fn derive(query: &str) -> String {
-    // format!("{}", deriver::derivation(query))
-    let x = deriver::derivation_dot(query);
-    println!("{x}");
-    deriver::derivation_html(query)
+    let d = deriver::derivation(query);
+    // let dot = deriver::derivation_dot(&d);
+    // println!("{dot}");
+    deriver::derivation_html(&d)
 }
 
 #[launch]
