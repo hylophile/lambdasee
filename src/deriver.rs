@@ -774,3 +774,42 @@ fn derive_html() {
 // a:*,b:*,x:a,y:a->b |- (/x:c.(y x)) :*   panic
 // S : ∗, P : S → ∗, A : ∗ |- (Πx : S . (A → P x)) → A → Πy : S . P y : *
 // a:*,b:*,S : ∗, Q : S → S → ∗ |- (Πx:S. /y : S . (Q x y → Q y x → (/a:*.a))) → Πz : S . (Q z z → (/b:*.b)) : *
+
+fn substitute(expr: &Rc<Expr>, target: &str, replacement: Rc<Expr>) -> Rc<Expr> {
+    let a = &**expr;
+    match a {
+        Expr::Identifier(name) if name == target => replacement,
+        Expr::Application { lhs, rhs } => Rc::new(Expr::Application {
+            lhs: substitute(lhs, target, replacement.clone()),
+            rhs: substitute(rhs, target, replacement.clone()),
+        }),
+        Expr::LambdaAbstraction { ident, etype, body } => Rc::new(Expr::LambdaAbstraction {
+            ident: ident.clone(),
+            etype: substitute(etype, target, replacement.clone()),
+            body: substitute(body, target, replacement.clone()),
+        }),
+        Expr::PiAbstraction { ident, etype, body } => Rc::new(Expr::PiAbstraction {
+            ident: ident.clone(),
+            etype: substitute(etype, target, replacement.clone()),
+            body: substitute(body, target, replacement.clone()),
+        }),
+        Expr::FreeVariable { ident: _, etype: _ } => unreachable!(),
+        Expr::Judgement {
+            context: _,
+            expr: _,
+            etype: _,
+        } => unreachable!(),
+        _ => expr.clone(),
+    }
+}
+
+#[test]
+fn subst() {
+    let s = "S : ∗, P : S → ∗, A : ∗ |- (Πx : S . (A → P x)) → A → Πy : S . P y : *";
+    // let s = "S : ∗, P : S → ∗, A : ∗ |- (Πx : S . (A → P x)) → A → Πy : S . P y : *";
+    let j = parser::parse_judgement(s).unwrap();
+    let mut ns = identifier_names(Rc::new(j));
+    let mut ns = ns.drain().collect::<Vec<_>>();
+    ns.sort();
+    assert_eq!(ns, vec!["A", "P", "S", "x", "y"]);
+}
