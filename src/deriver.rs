@@ -3,11 +3,12 @@ use std::{
     collections::{HashMap, HashSet},
     error,
     fmt::{self},
+    hash::Hash,
     rc::Rc,
 };
 use thiserror::Error;
 
-use crate::parser::{self, Expr, identifier_names};
+use crate::parser::{self, identifier_names, Expr};
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub enum Rule {
@@ -155,6 +156,15 @@ fn test_all_except_last() {
 }
 
 fn derive(judgement: Rc<Expr>) -> Result<Derivation, DeriveError> {
+    let global_ident_names = identifier_names(judgement.clone());
+
+    derive_h(judgement, &global_ident_names)
+}
+
+fn derive_h(
+    judgement: Rc<Expr>,
+    global_ident_names: &HashSet<String>,
+) -> Result<Derivation, DeriveError> {
     match (*judgement).clone() {
         Expr::Judgement {
             context,
@@ -209,27 +219,17 @@ fn derive(judgement: Rc<Expr>) -> Result<Derivation, DeriveError> {
                     // );
                     // Var rule
                     if *last_fv == judgement_expr && *last_fv_type == judgement_type {
-                        // let ident_type_sort = match ident_type {
-                        //     Expr::Star => Expr::Box,
-                        //     Expr::Identifier(_) => {
-                        //         // TODO could this possibly lead to s \not\in {*, #} ? (illegal for var rule)
-                        //         find_type_in_context(ident_type.clone(), context.to_vec())
-                        //             .expect(&format!("not in context: {ident_type:?}"))
-                        //     }
-
-                        //     ref x => panic!("ident_type_sort: {:?}", ident_type),
-                        // };
-
                         // TODO x \not\in\ context
                         let aa = infer_type(&context, last_fv_type.clone());
                         let p1 = match aa {
-                            Ok(t) => Some(Rc::new(derive(
+                            Ok(t) => Some(Rc::new(derive_h(
                                 Expr::Judgement {
                                     context: new_context,
                                     expr: (last_fv_type.clone()),
                                     etype: (t),
                                 }
                                 .into(),
+                                global_ident_names,
                             ))),
                             Err(e) => Some(Rc::new(Err(e))),
                         };
@@ -254,23 +254,25 @@ fn derive(judgement: Rc<Expr>) -> Result<Derivation, DeriveError> {
                                 etype: (judgement_type.clone()),
                             };
 
-                            let premiss_one = Some(Rc::new(derive(
+                            let premiss_one = Some(Rc::new(derive_h(
                                 Expr::Judgement {
                                     context: new_context.clone(),
                                     expr: (judgement_expr.clone()),
                                     etype: (judgement_type),
                                 }
                                 .into(),
+                                global_ident_names,
                             )));
 
                             let premiss_two = match infer_type(&context, last_fv_type.clone()) {
-                                Ok(t) => Some(Rc::new(derive(
+                                Ok(t) => Some(Rc::new(derive_h(
                                     Expr::Judgement {
                                         context: new_context,
                                         expr: (last_fv_type.clone()),
                                         etype: (t),
                                     }
                                     .into(),
+                                    global_ident_names,
                                 ))),
                                 Err(e) => Some(Rc::new(Err(e))),
                             };
@@ -306,29 +308,34 @@ fn derive(judgement: Rc<Expr>) -> Result<Derivation, DeriveError> {
                 let p1_type = infer_type(&context, pi_type.clone());
 
                 let premiss_one = match p1_type.clone() {
-                    Ok(t) => Some(Rc::new(derive(
+                    Ok(t) => Some(Rc::new(derive_h(
                         Expr::Judgement {
                             context: context.to_vec(),
                             expr: pi_type.clone(),
                             etype: (t),
                         }
                         .into(),
+                        global_ident_names,
                     ))),
                     Err(e) => Some(Rc::new(Err(e))),
                 };
 
                 let pi_ident = match pi_ident {
                     Some(i) => i.clone(),
-                    None => Expr::Identifier("_".to_string()).into(), // TODO search free variables, pick a new one
+                    None => {
+                        let new_ident_name = new_ident_name(judgement, global_ident_names);
+                        Expr::Identifier(new_ident_name).into()
+                    }
                 };
 
-                let premiss_two = Some(Rc::new(derive(
+                let premiss_two = Some(Rc::new(derive_h(
                     Expr::Judgement {
                         context: append_to_context(pi_ident, pi_type.clone(), context.to_vec()),
                         expr: pi_body.clone(),
                         etype: (judgement_type.clone()),
                     }
                     .into(),
+                    global_ident_names,
                 )));
                 let s2 = judgement_type.clone();
 
@@ -372,22 +379,24 @@ fn derive(judgement: Rc<Expr>) -> Result<Derivation, DeriveError> {
                 //     etype: Rc::new(b.clone()),
                 //     body: Rc::new(judgement_type.clone()),
                 // };
-                let p1 = Some(Rc::new(derive(
+                let p1 = Some(Rc::new(derive_h(
                     Expr::Judgement {
                         context: context.to_vec(),
                         expr: lhs.clone(),
                         etype: (p1_type),
                     }
                     .into(),
+                    global_ident_names,
                 )));
 
-                let p2 = Some(Rc::new(derive(
+                let p2 = Some(Rc::new(derive_h(
                     Expr::Judgement {
                         context: context.to_vec(),
                         expr: rhs.clone(),
                         etype: (p2_type),
                     }
                     .into(),
+                    global_ident_names,
                 )));
 
                 return Ok(Derivation {
@@ -417,23 +426,25 @@ fn derive(judgement: Rc<Expr>) -> Result<Derivation, DeriveError> {
                 let p1_new_fv_type = lambda_ident_type;
                 let p1_new_context =
                     append_to_context(p1_new_fv.clone(), p1_new_fv_type.clone(), context.clone());
-                let p1 = Some(Rc::new(derive(
+                let p1 = Some(Rc::new(derive_h(
                     Expr::Judgement {
                         context: p1_new_context,
                         expr: p1_body.clone(),
                         etype: p1_type.clone(),
                     }
                     .into(),
+                    global_ident_names,
                 )));
 
                 let s = (infer_type(&context, judgement_type.clone()))?;
-                let p2 = Some(Rc::new(derive(
+                let p2 = Some(Rc::new(derive_h(
                     Expr::Judgement {
                         context: context.clone(),
                         expr: judgement_type.clone(),
                         etype: s,
                     }
                     .into(),
+                    global_ident_names,
                 )));
 
                 return Ok(Derivation {
@@ -760,20 +771,15 @@ pub fn derivation_html(d: &DedupedDerivationResult) -> String {
     }
 }
 
-#[test]
-fn derive_html() {
-    let s ="a:*,b:*,S : ∗, Q : S → S → ∗ |- (Πx:S. /y : S . (Q x y → Q y x → (/a:*.a))) → Πz : S . (Q z z → (/b:*.b)) : *";
-    let d = derivation(s);
-    let d = derivation(s);
-    let d = derivation(s);
-    let d = derivation(s);
-    // derivation_html(&d);
-}
-
-// a:*->*,b:*,m:a->b,n:a |- a b : *
-// a:*,b:*,x:a,y:a->b |- (/x:c.(y x)) :*   panic
-// S : ∗, P : S → ∗, A : ∗ |- (Πx : S . (A → P x)) → A → Πy : S . P y : *
-// a:*,b:*,S : ∗, Q : S → S → ∗ |- (Πx:S. /y : S . (Q x y → Q y x → (/a:*.a))) → Πz : S . (Q z z → (/b:*.b)) : *
+// #[test]
+// fn derive_html() {
+//     let s ="a:*,b:*,S : ∗, Q : S → S → ∗ |- (Πx:S. /y : S . (Q x y → Q y x → (/a:*.a))) → Πz : S . (Q z z → (/b:*.b)) : *";
+//     let d = derivation(s);
+//     let d = derivation(s);
+//     let d = derivation(s);
+//     let d = derivation(s);
+//     // derivation_html(&d);
+// }
 
 fn substitute(expr: &Rc<Expr>, target: &str, replacement: Rc<Expr>) -> Rc<Expr> {
     let a = &**expr;
@@ -813,3 +819,39 @@ fn subst() {
     ns.sort();
     assert_eq!(ns, vec!["A", "P", "S", "x", "y"]);
 }
+
+fn new_ident_name(expr: Rc<Expr>, global_ident_names: &HashSet<String>) -> String {
+    let local_ident_names = identifier_names(expr);
+    let ident_names: HashSet<_> = local_ident_names.union(global_ident_names).collect();
+    let ranges = vec!['x'..='z', 'u'..='w', 'p'..='t', 'a'..='z'];
+    for range in ranges {
+        for c in range {
+            let new_char = c.to_string();
+            if !ident_names.contains(&new_char) {
+                return new_char;
+            }
+        }
+    }
+
+    panic!()
+}
+
+#[test]
+fn ident_name() {
+    let s = "a:*,b:*,x:*,y:*,z:*|-a:*";
+
+    let s = "S : ∗, P : S → ∗, A : ∗ |- (Πx : S . (A → P x)) → A → Πy : S . P y : *";
+    let j = parser::parse_judgement(s).unwrap();
+    // let ns = identifier_names(Rc::new(j));
+    let new_i = new_ident_name(j.into(), &HashSet::new());
+    assert_eq!(new_i, "z");
+    // let mut ns = ns.drain().collect::<Vec<_>>();
+    // ns.sort();
+    // assert_eq!(ns, vec!["A", "P", "S", "x", "y"]);
+}
+
+// a:*->*,b:*,m:a->b,n:a |- a b : *
+// S : ∗, P : S → ∗, A : ∗ |- (Πx : S . (A → P x)) → A → Πy : S . P y : *    panic
+// a:*,b:*,S : ∗, Q : S → S → ∗ |- (Πx:S. /y : S . (Q x y → Q y x → (/a:*.a))) → Πz : S . (Q z z → (/b:*.b)) : *
+// a:*,b:*,x:a,y:a->b |- (/x:c.(y x)) :*   panic
+//b:* |- (\a:b.a a) : (/a:b.b)    cant infer a
