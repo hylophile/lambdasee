@@ -1,12 +1,12 @@
 extern crate pest;
 
-use std::borrow::Borrow;
-use std::collections::HashSet;
 use std::rc::Rc;
 
 use pest::iterators::Pairs;
 use pest::pratt_parser::PrattParser;
 use pest::Parser;
+
+use crate::expr::Expr;
 
 #[derive(pest_derive::Parser)]
 #[grammar = "grammar.pest"]
@@ -24,115 +24,6 @@ lazy_static::lazy_static! {
             .op(Op::infix(appl, Left))
     };
 }
-
-#[derive(Debug, PartialEq, Clone, Hash, Eq)]
-pub enum Expr {
-    Identifier(String),
-    Star,
-    Box,
-    Bottom,
-    Application {
-        lhs: Rc<Expr>,
-        rhs: Rc<Expr>,
-    },
-    LambdaAbstraction {
-        ident: Rc<Expr>,
-        etype: Rc<Expr>,
-        body: Rc<Expr>,
-    },
-    PiAbstraction {
-        ident: Option<Rc<Expr>>,
-        etype: Rc<Expr>,
-        body: Rc<Expr>,
-    },
-    FreeVariable {
-        ident: Rc<Expr>,
-        etype: Rc<Expr>,
-    },
-    Judgement {
-        context: Vec<Expr>,
-        expr: Rc<Expr>,
-        etype: Rc<Expr>,
-    },
-}
-
-impl Expr {
-    pub fn new_pi(ident: Rc<Expr>, etype: Rc<Expr>, body: Rc<Expr>) -> Self {
-        let ident_name = match (*ident).borrow() {
-            Expr::Identifier(x) => x,
-            _ => unreachable!(),
-        };
-        let ident = if identifier_names(body.clone()).contains(ident_name) {
-            Some(Rc::new(Expr::Identifier(ident_name.to_string())))
-        } else {
-            None
-        };
-        Self::PiAbstraction {
-            ident,
-            etype: etype.clone(),
-            body: body.clone(),
-        }
-    }
-    // Expr::
-}
-
-#[test]
-fn idnames() {
-    let s = "S : ∗, P : S → ∗, A : ∗ |- (Πx : S . (A → P x)) → A → Πy : S . P y : *";
-    let j = parse_judgement(s).unwrap();
-    let mut ns = identifier_names(Rc::new(j));
-    let mut ns = ns.drain().collect::<Vec<_>>();
-    ns.sort();
-    assert_eq!(ns, vec!["A", "P", "S", "x", "y"]);
-}
-
-fn identifier_names_h(expr: Rc<Expr>, names: &mut HashSet<String>) {
-    match (*expr).borrow() {
-        Expr::Identifier(x) => {
-            names.insert(x.to_string());
-        }
-        Expr::Application { lhs, rhs } => {
-            identifier_names_h(lhs.clone(), names);
-            identifier_names_h(rhs.clone(), names);
-        }
-        Expr::LambdaAbstraction { ident, etype, body } => {
-            identifier_names_h(ident.clone(), names);
-            identifier_names_h(etype.clone(), names);
-            identifier_names_h(body.clone(), names);
-        }
-        Expr::PiAbstraction { ident, etype, body } => {
-            if let Some(ident) = ident {
-                identifier_names_h(ident.clone(), names);
-            }
-            identifier_names_h(etype.clone(), names);
-            identifier_names_h(body.clone(), names);
-        }
-        Expr::FreeVariable { ident, etype } => {
-            identifier_names_h(ident.clone(), names);
-            identifier_names_h(etype.clone(), names);
-        }
-        Expr::Judgement {
-            context,
-            expr,
-            etype,
-        } => {
-            for x in context {
-                identifier_names_h(Rc::new(x.clone()), names);
-            }
-            identifier_names_h(expr.clone(), names);
-            identifier_names_h(etype.clone(), names);
-        }
-        _ => (),
-    }
-}
-pub fn identifier_names(expr: Rc<Expr>) -> HashSet<String> {
-    let mut names = HashSet::new();
-
-    identifier_names_h(expr, &mut names);
-
-    names
-}
-
 fn parse_expr(pairs: Pairs<Rule>) -> Expr {
     PRATT_PARSER
         .map_primary(|primary| match primary.as_rule() {
@@ -173,7 +64,7 @@ fn parse_expr(pairs: Pairs<Rule>) -> Expr {
 
                 let context = inner.next().unwrap().into_inner();
                 let context: Vec<_> = context
-                    .map(|pair| parse_expr(Pairs::single(pair)))
+                    .map(|pair| Rc::new(parse_expr(Pairs::single(pair))))
                     .collect();
 
                 let expr = Rc::new(parse_expr(inner.next().unwrap().into_inner()));
@@ -219,129 +110,6 @@ fn it_works() {
     // println!("{:#?}", p(line));
     // panic!();
 }
-
-pub fn stringify(e: Rc<Expr>) -> String {
-    match (*e).borrow() {
-        Expr::Identifier(s) => s.to_string(),
-        Expr::Star => "∗".to_string(),
-        Expr::Box => "□".to_string(),
-        Expr::Bottom => "⊥".to_string(),
-        Expr::Application { lhs, rhs } => {
-            format!("({} {})", stringify(lhs.clone()), stringify(rhs.clone()))
-        }
-        Expr::LambdaAbstraction { ident, etype, body } => {
-            format!(
-                "(λ{} : {} . {})",
-                stringify(ident.clone()),
-                stringify(etype.clone()),
-                stringify(body.clone())
-            )
-        }
-        Expr::PiAbstraction { ident, etype, body } => match ident {
-            Some(i) => {
-                format!(
-                    "(Π{} : {} . {})",
-                    stringify(i.clone()),
-                    stringify(etype.clone()),
-                    stringify(body.clone())
-                )
-            }
-            None => {
-                match ((*etype).borrow(), (*body).borrow()) {
-                    (Expr::Identifier(s1), Expr::Identifier(s2)) => format!("({s1} → {s2})"),
-                    (Expr::Star | Expr::Box, Expr::Star | Expr::Box) => {
-                        format!(
-                            "({} → {})",
-                            stringify(etype.clone()),
-                            stringify(body.clone())
-                        )
-                    }
-                    _ => format!(
-                        "({} → {})",
-                        stringify(etype.clone()),
-                        stringify(body.clone())
-                    ),
-                }
-
-                // format!("{} → {}", f(*etype), x)
-            }
-        },
-        Expr::FreeVariable { ident, etype } => {
-            format!(
-                "{} : {}",
-                stringify(ident.clone()),
-                stringify(etype.clone())
-            )
-        }
-        Expr::Judgement {
-            context,
-            expr,
-            etype,
-        } => {
-            let mut context = context
-                .iter()
-                .map(|e| stringify(Rc::new(e.clone())))
-                .collect::<Vec<_>>()
-                // .join(",\n");
-                .join(", ");
-            if context.is_empty() {
-                context = "∅".to_string();
-            }
-            format!(
-                // "{} \n\n⊢ {} \n\n: {}",
-                "{} ⊢ {} : {}",
-                context,
-                stringify(expr.clone()),
-                stringify(etype.clone())
-            )
-        }
-    }
-}
-
-pub fn htmlify(e: Expr) -> String {
-    match e {
-        Expr::Judgement {
-            context,
-            expr,
-            etype,
-        } => {
-            let mut context = context
-                .iter()
-                .map(|e| stringify(Rc::new(e.clone())))
-                .collect::<Vec<_>>()
-                // .join(",\n");
-                .join(", ");
-            if context.is_empty() {
-                context = "∅".to_string();
-            }
-            format!(
-                r#"<code class="context">{}</code><code class="turnstile"> ⊢ </code><code class="expr">{}</code><code class="type-symbol"> : </code><code class="type">{}</code>"#,
-                (context),
-                stringify(expr),
-                stringify(etype)
-            )
-        }
-        _ => stringify(Rc::new(e)),
-    }
-}
-
-// #[test]
-// fn e() {
-//     let line = "a:b⊢a : (b)";
-//     assert_eq!("a : b ⊢ a : b", stringify(parse_judgement(line).unwrap()));
-
-//     let _line = "C ⊢ λα : ∗ . λβ : (∗ → ∗) . a b β(β α) : ∗ → (∗ → ∗) → ∗";
-//     let _line = "C ⊢ λα : ∗ . λβ : (∗ → ∗) . a b β(β α) : ∗ → ∗ → ∗ → ∗";
-//     let line = "C |- (Πx : S . (A → P x)) → A → Πy : S . P y : kp";
-//     // let line = "C |- (Πx : S . (A → P x)) : p";
-//     // let line = "C |- A → P x : p";
-//     // let line = "C ⊢ a : ∗ → (∗ → ∗) → ∗";
-//     // let line = "C ⊢ a : a -> (* -> b) -> d";
-//     let r = parse_judgement(line).unwrap();
-//     println!("{r:#?}");
-//     assert_eq!("a : b ⊢ a : b", stringify(r));
-//     panic!();
-// }
 
 pub fn parse_judgement(input: &str) -> Result<Expr, pest::error::Error<Rule>> {
     match LambdaCParser::parse(Rule::judgement_program, input) {

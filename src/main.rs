@@ -1,4 +1,5 @@
 mod deriver;
+mod expr;
 mod parser;
 
 #[macro_use]
@@ -12,7 +13,7 @@ use rocket::fs::FileServer;
 fn parse(query: &str) -> String {
     // deriver::derivation(query)
     match parser::parse_judgement(query) {
-        Ok(s) => parser::htmlify(s),
+        Ok(s) => expr::htmlify(&s),
         Err(e) => format!("<code>{e}</code>"),
     }
 }

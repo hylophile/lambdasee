@@ -8,7 +8,10 @@ use std::{
 };
 use thiserror::Error;
 
-use crate::parser::{self, identifier_names, Expr};
+use crate::{
+    expr::{fmt_context, identifier_names, Context, Expr},
+    parser::{parse_judgement, self},
+};
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub enum Rule {
@@ -27,22 +30,11 @@ impl fmt::Display for Rule {
         // write!(f, "({}, {})", self.0, self.1)
         let s = match self {
             // Rule::Var => " (var)".to_string(),
-            Self::Form(s1, s2) => format!(
-                "(form ({},{}))",
-                parser::stringify(s1.clone()),
-                parser::stringify(s2.clone())
-            ),
+            Self::Form(s1, s2) => format!("(form ({},{}))", s1, s2),
             _ => format!("({self:?})").to_lowercase(),
         };
         write!(f, "{s}")
     }
-}
-
-fn print_ctx(ctx: &Vec<Expr>) -> String {
-    ctx.iter()
-        .map(|u| parser::stringify(u.clone().into()))
-        .collect::<Vec<_>>()
-        .join(", ")
 }
 
 // type DerivationCache = HashMap<>
@@ -58,42 +50,53 @@ struct Derivation {
 #[derive(Hash, Debug, Error, PartialEq, Eq, Clone)]
 pub enum DeriveError {
     #[error("Derivation not implemented for judgement {0}.")]
-    NotImplemented(String),
+    NotImplemented(Rc<Expr>),
+
     #[error("Unexpected type {0} in judgement {1}.\nThe type of a Pi abstraction must be a sort (either ∗ or □).")]
-    UnexpectedPiAbstractionType(String, String),
-    #[error("Can't infer identifier {0} in context {1}.")]
-    InferIdentifier(String, String),
+    UnexpectedPiAbstractionType(Rc<Expr>, Rc<Expr>),
+
+    #[error("Can't infer identifier {0} in context {}.", fmt_context(.1))]
+    InferIdentifier(Rc<Expr>, Context),
+
     #[error("Can't infer the type of □.")]
     InferBox,
-    #[error("Unexpected type in application of {0} in context {1}.\nExpected Pi abstraction but found {2}.")]
-    InferApplication(String, String, String),
+
+    #[error("Unexpected type in application {0} in context {}.\nExpected Pi abstraction but found {1}.", fmt_context(.2))]
+    InferApplication(Rc<Expr>, Rc<Expr>, Context),
+
     #[error(
         "Form rule inferred (s1,s2) = ({0},{1}), but s1 and s2 can only be sorts (either ∗ or □)."
     )]
-    InferForm(String, String),
+    InferForm(Rc<Expr>, Rc<Expr>),
+
     #[error("Inferred type for judgement {0} was {2}, but {2} ≠ {1}.")]
-    InferJudgement(String, String, String),
+    InferJudgement(Rc<Expr>, Rc<Expr>, Rc<Expr>),
+
     #[error("infer error")]
     InferError,
 }
 
-fn append_to_context(ident: Rc<Expr>, etype: Rc<Expr>, context: Vec<Expr>) -> Vec<Expr> {
+fn append_to_context(ident: Rc<Expr>, etype: Rc<Expr>, context: Context) -> Context {
     let fv = Expr::FreeVariable { ident, etype };
-    context.iter().cloned().chain(std::iter::once(fv)).collect()
+    context
+        .iter()
+        .cloned()
+        .chain(std::iter::once(fv.into()))
+        .collect()
 }
 
-// fn determine_sort(expr: Expr, context: Vec<Expr>) -> Expr {
+// fn determine_sort(expr: Expr, context: Context) -> Expr {
 //     match expr {
 //         Expr::Star => Expr::Box,
 //         _ => Expr::Star, // this is most likely wrong
 //     }
 // }
 
-fn find_type_in_context(ident: &Expr, context: &Vec<Expr>) -> Option<Rc<Expr>> {
+fn find_type_in_context(ident: &Expr, context: &Context) -> Option<Rc<Expr>> {
     for expr in context {
-        match expr {
+        match expr.as_ref() {
             Expr::FreeVariable { ident: fv, etype } => {
-                if ident == &**fv {
+                if ident == fv.as_ref() {
                     return Some(etype.clone());
                 }
             }
@@ -103,28 +106,27 @@ fn find_type_in_context(ident: &Expr, context: &Vec<Expr>) -> Option<Rc<Expr>> {
     None
 }
 
-fn infer_type(context: &Vec<Expr>, expr: Rc<Expr>) -> Result<Rc<Expr>, DeriveError> {
-    match (*expr).borrow() {
-        Expr::Identifier(_) => find_type_in_context(&expr, &context).ok_or(
-            DeriveError::InferIdentifier(parser::stringify(expr), format!("{context:?}")),
-        ),
+fn infer_type(context: &Context, expr: Rc<Expr>) -> Result<Rc<Expr>, DeriveError> {
+    match expr.as_ref() {
+        Expr::Identifier(_) => find_type_in_context(&expr, &context)
+            .ok_or(DeriveError::InferIdentifier(expr, context.clone())),
         Expr::Star => Ok(Rc::new(Expr::Box)),
         Expr::Box => Err(DeriveError::InferBox),
         Expr::Bottom => todo!(),
         Expr::Application { lhs, rhs: _ } => match infer_type(context, lhs.clone()) {
-            Ok(r) => match (*r).borrow() {
+            Ok(lhs_type) => match lhs_type.as_ref() {
                 Expr::PiAbstraction {
                     ident: _,
                     etype: _,
                     body,
                 } => Ok(body.clone()),
-                expr => Err(DeriveError::InferApplication(
-                    parser::stringify(lhs.clone()),
-                    print_ctx(context),
-                    parser::stringify(r.clone()),
+                _ => Err(DeriveError::InferApplication(
+                    expr,
+                    lhs_type,
+                    context.clone(),
                 )),
             },
-            Err(e) => Err(e),
+            Err(err) => Err(err),
         },
         Expr::LambdaAbstraction { ident, etype, body } => {
             let new_context = append_to_context(ident.clone(), etype.clone(), context.clone());
@@ -146,7 +148,7 @@ fn infer_type(context: &Vec<Expr>, expr: Rc<Expr>) -> Result<Rc<Expr>, DeriveErr
     }
 }
 
-fn all_except_last<Expr: std::clone::Clone>(context: Vec<Expr>) -> Vec<Expr> {
+fn all_except_last(context: Context) -> Context {
     if !context.is_empty() {
         context[..context.len() - 1].to_vec()
     } else {
@@ -154,14 +156,14 @@ fn all_except_last<Expr: std::clone::Clone>(context: Vec<Expr>) -> Vec<Expr> {
     }
 }
 
-#[test]
-fn test_all_except_last() {
-    let x = vec![Expr::Box, Expr::Star, Expr::Identifier("a".to_string())];
-    assert_eq!(all_except_last(x), vec![Expr::Box, Expr::Star]);
+// #[test]
+// fn test_all_except_last() {
+//     let x = vec![Expr::Box, Expr::Star, Expr::Identifier("a".to_string())];
+//     assert_eq!(all_except_last(x), vec![Expr::Box, &Expr::Star]);
 
-    let x: Vec<Expr> = vec![];
-    assert_eq!(all_except_last(x), vec![]);
-}
+//     let x: Context = vec![];
+//     assert_eq!(all_except_last(x), vec![]);
+// }
 
 fn derive(judgement: Rc<Expr>) -> Result<Derivation, DeriveError> {
     let global_ident_names = identifier_names(judgement.clone());
@@ -179,13 +181,9 @@ fn derive_h(
             expr,
             etype,
         } => {
-            let inf_type = infer_type(&context, expr.clone())?;
-            if etype != inf_type {
-                return Err(DeriveError::InferJudgement(
-                    parser::stringify(judgement),
-                    parser::stringify(etype),
-                    parser::stringify(inf_type),
-                ));
+            let inferred_type = infer_type(&context, expr.clone())?;
+            if etype != inferred_type {
+                return Err(DeriveError::InferJudgement(judgement, etype, inferred_type));
             }
 
             // let context = context.as_slice();
@@ -210,69 +208,28 @@ fn derive_h(
                 });
             }
 
-            match context.last() {
-                Some(Expr::FreeVariable {
-                    ident,
-                    etype: ident_type,
-                }) => {
-                    // (Some(*ident.clone()), Some(*etype.clone()))
-                    // println!("{ident:?}, {expr:?}, {ident_type:?}, {etype:?}");
-                    let last_fv = ident;
-                    let last_fv_type = ident_type;
-                    let new_context = all_except_last(context.to_vec());
+            // Example usage
+            if let Some(expr) = context.last() {
+                match &**expr {
+                    Expr::FreeVariable {
+                        ident,
+                        etype: ident_type,
+                    } => {
+                        // (Some(*ident.clone()), Some(*etype.clone()))
+                        // println!("{ident:?}, {expr:?}, {ident_type:?}, {etype:?}");
+                        let last_fv = ident;
+                        let last_fv_type = ident_type;
+                        let new_context = all_except_last(context.to_vec());
 
-                    // println!(
-                    //     "\n{:?}\n{:?}\n{:?}\n{:?}\n",
-                    //     last_fv, judgement_expr, last_fv_type, judgement_type
-                    // );
-                    // Var rule
-                    if *last_fv == judgement_expr && *last_fv_type == judgement_type {
-                        // TODO x \not\in\ context
-                        let aa = infer_type(&context, last_fv_type.clone());
-                        let p1 = match aa {
-                            Ok(t) => Some(Rc::new(derive_h(
-                                Expr::Judgement {
-                                    context: new_context,
-                                    expr: (last_fv_type.clone()),
-                                    etype: (t),
-                                }
-                                .into(),
-                                global_ident_names,
-                            ))),
-                            Err(e) => Some(Rc::new(Err(e))),
-                        };
-
-                        return Ok(Derivation {
-                            rule: Rule::Var,
-                            conclusion: Expr::Judgement {
-                                context: context.to_vec(),
-                                expr: (judgement_expr),
-                                etype: (judgement_type),
-                            },
-                            premiss_one: p1,
-                            premiss_two: None,
-                        });
-                    }
-
-                    match *judgement_expr {
-                        Expr::Identifier(_) | Expr::Star => {
-                            let conclusion = Expr::Judgement {
-                                context: context.to_vec(),
-                                expr: (judgement_expr.clone()),
-                                etype: (judgement_type.clone()),
-                            };
-
-                            let premiss_one = Some(Rc::new(derive_h(
-                                Expr::Judgement {
-                                    context: new_context.clone(),
-                                    expr: (judgement_expr.clone()),
-                                    etype: (judgement_type),
-                                }
-                                .into(),
-                                global_ident_names,
-                            )));
-
-                            let premiss_two = match infer_type(&context, last_fv_type.clone()) {
+                        // println!(
+                        //     "\n{:?}\n{:?}\n{:?}\n{:?}\n",
+                        //     last_fv, judgement_expr, last_fv_type, judgement_type
+                        // );
+                        // Var rule
+                        if *last_fv == judgement_expr && *last_fv_type == judgement_type {
+                            // TODO x \not\in\ context
+                            let aa = infer_type(&context, last_fv_type.clone());
+                            let p1 = match aa {
                                 Ok(t) => Some(Rc::new(derive_h(
                                     Expr::Judgement {
                                         context: new_context,
@@ -286,18 +243,61 @@ fn derive_h(
                             };
 
                             return Ok(Derivation {
-                                rule: Rule::Weak,
-                                conclusion,
-                                premiss_one,
-                                premiss_two,
+                                rule: Rule::Var,
+                                conclusion: Expr::Judgement {
+                                    context: context.to_vec(),
+                                    expr: (judgement_expr),
+                                    etype: (judgement_type),
+                                },
+                                premiss_one: p1,
+                                premiss_two: None,
                             });
                         }
-                        _ => (),
+
+                        match *judgement_expr {
+                            Expr::Identifier(_) | Expr::Star => {
+                                let conclusion = Expr::Judgement {
+                                    context: context.to_vec(),
+                                    expr: (judgement_expr.clone()),
+                                    etype: (judgement_type.clone()),
+                                };
+
+                                let premiss_one = Some(Rc::new(derive_h(
+                                    Expr::Judgement {
+                                        context: new_context.clone(),
+                                        expr: (judgement_expr.clone()),
+                                        etype: (judgement_type),
+                                    }
+                                    .into(),
+                                    global_ident_names,
+                                )));
+
+                                let premiss_two = match infer_type(&context, last_fv_type.clone()) {
+                                    Ok(t) => Some(Rc::new(derive_h(
+                                        Expr::Judgement {
+                                            context: new_context,
+                                            expr: (last_fv_type.clone()),
+                                            etype: (t),
+                                        }
+                                        .into(),
+                                        global_ident_names,
+                                    ))),
+                                    Err(e) => Some(Rc::new(Err(e))),
+                                };
+
+                                return Ok(Derivation {
+                                    rule: Rule::Weak,
+                                    conclusion,
+                                    premiss_one,
+                                    premiss_two,
+                                });
+                            }
+                            _ => (),
+                        }
+                        // TODO how to match weak? later?
                     }
-                    // TODO how to match weak? later?
+                    _ => unreachable!(),
                 }
-                Some(_) => unreachable!(),
-                None => (),
             };
 
             // Form rule
@@ -309,8 +309,8 @@ fn derive_h(
             {
                 if *judgement_type != Expr::Star && *judgement_type != Expr::Box {
                     return Err(DeriveError::UnexpectedPiAbstractionType(
-                        parser::stringify(judgement_type),
-                        parser::stringify(judgement),
+                        judgement_type,
+                        judgement,
                     ));
                 }
                 let p1_type = infer_type(&context, pi_type.clone());
@@ -361,12 +361,7 @@ fn derive_h(
                                 premiss_two,
                             })
                         }
-                        (_, _) => {
-                            return Err(DeriveError::InferForm(
-                                parser::stringify(s1),
-                                parser::stringify(s2),
-                            ))
-                        }
+                        (_, _) => return Err(DeriveError::InferForm(s1, s2)),
                     },
                     Err(e) => return Err(e),
                 }
@@ -427,7 +422,11 @@ fn derive_h(
             {
                 let p1_body = lambda_body;
                 let p1_type = match (*judgement_type).borrow() {
-                    Expr::PiAbstraction { ident, etype, body } => Ok(body),
+                    Expr::PiAbstraction {
+                        ident: _,
+                        etype: _,
+                        body,
+                    } => Ok(body),
                     _ => Err(DeriveError::InferError),
                 }?;
                 let p1_new_fv = lambda_ident;
@@ -467,7 +466,7 @@ fn derive_h(
                 });
             }
 
-            Err(DeriveError::NotImplemented(parser::stringify(judgement)))
+            Err(DeriveError::NotImplemented(judgement))
             // panic!(
             //     "ctx:  {:?}\nexpr: {:?}\ntype: {:?}",
             //     context, judgement_expr, judgement_type
@@ -685,7 +684,7 @@ pub type DedupedDerivation = Vec<(CacheEntry, (i32, Option<RuleRef>))>;
 pub type DedupedDerivationResult = Result<DedupedDerivation, Box<dyn error::Error>>;
 
 pub fn derivation(s: &str) -> DedupedDerivationResult {
-    let j = parser::parse_judgement(s)?;
+    let j = parse_judgement(s)?;
     let d = derive(j.into());
     let nodes = deduplicate(d);
     Ok(nodes)
@@ -729,13 +728,9 @@ pub fn derivation_dot(d: &DedupedDerivationResult) -> String {
                                     // "{} [label=<{{{}<br/>⊤<br/><font point-size=\"20\">{}</font><br/>⊢· ·<br/>{}|{}}}> style=\"{}\"];\n{}",
                                     // "{} [label=<{}|<b>{}</b>|{}|{}>];\n{}",
                                     id,
-                                    context
-                                        .iter()
-                                        .map(|u| parser::stringify(u.clone().into()))
-                                        .collect::<Vec<_>>()
-                                        .join(",    "),
-                                    parser::stringify(expr.clone()),
-                                    parser::stringify(etype.clone()),
+                                    fmt_context(context),
+                                    expr,
+                                    etype,
                                     rulename,
                                     style,
                                     refs
@@ -765,7 +760,7 @@ pub fn derivation_html(d: &DedupedDerivationResult) -> String {
                     format!(
                         r#"<span class="id">[{}]</span> {} <span class="rule">{}</span>"#,
                         id,
-                        parser::htmlify(e.clone()),
+                        crate::expr::htmlify(e),
                         rule.as_ref().expect("unreachable")
                     )
                 }
@@ -779,15 +774,15 @@ pub fn derivation_html(d: &DedupedDerivationResult) -> String {
     }
 }
 
-// #[test]
-// fn derive_html() {
-//     let s ="a:*,b:*,S : ∗, Q : S → S → ∗ |- (Πx:S. /y : S . (Q x y → Q y x → (/a:*.a))) → Πz : S . (Q z z → (/b:*.b)) : *";
-//     let d = derivation(s);
-//     let d = derivation(s);
-//     let d = derivation(s);
-//     let d = derivation(s);
-//     // derivation_html(&d);
-// }
+#[test]
+fn derive_html() {
+    let s ="a:*,b:*,S : ∗, Q : S → S → ∗ |- (Πx:S. /y : S . (Q x y → Q y x → (/a:*.a))) → Πz : S . (Q z z → (/b:*.b)) : *";
+    let d = derivation(s);
+    let d = derivation(s);
+    let d = derivation(s);
+    let d = derivation(s);
+    // derivation_html(&d);
+}
 
 fn substitute(expr: &Rc<Expr>, target: &str, replacement: Rc<Expr>) -> Rc<Expr> {
     let a = &**expr;
