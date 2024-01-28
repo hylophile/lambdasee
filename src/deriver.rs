@@ -681,9 +681,9 @@ pub fn derivation_dot(d: &DedupedDerivationResult) -> String {
                         let (rulename, refs) = match ruleref {
                             Some(r) => match r {
                                 RuleRef::None(r) => (r, "".to_string()),
-                                RuleRef::One(r, ref1) => (r, format!("{} -> {};", ref1,id )),
+                                RuleRef::One(r, ref1) => (r, format!("{} -> {} [labeldistance=2 headlabel=\"1\"];", ref1,id )),
                                 RuleRef::Two(r, ref1, ref2) => {
-                                    (r, format!("{} -> {};\n{} -> {};", ref1, id, ref2, id))
+                                    (r, format!("{} -> {} [labeldistance=2 headlabel=\"1\"];\n{} -> {} [labeldistance=2 headlabel=\"2\"];", ref1, id, ref2, id))
                                 }
                             },
                             None => todo!(),
