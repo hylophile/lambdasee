@@ -38,6 +38,13 @@ impl fmt::Display for Rule {
     }
 }
 
+fn print_ctx(ctx: &Vec<Expr>) -> String {
+    ctx.iter()
+        .map(|u| parser::stringify(u.clone().into()))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 // type DerivationCache = HashMap<>
 
 #[derive(PartialEq, Debug, Clone)]
@@ -58,8 +65,8 @@ pub enum DeriveError {
     InferIdentifier(String, String),
     #[error("Can't infer the type of □.")]
     InferBox,
-    #[error("Can't infer the type of {0} in context {1}.")]
-    InferApplication(String, String),
+    #[error("Unexpected type in application of {0} in context {1}.\nExpected Pi abstraction but found {2}.")]
+    InferApplication(String, String, String),
     #[error(
         "Form rule inferred (s1,s2) = ({0},{1}), but s1 and s2 can only be sorts (either ∗ or □)."
     )]
@@ -111,9 +118,10 @@ fn infer_type(context: &Vec<Expr>, expr: Rc<Expr>) -> Result<Rc<Expr>, DeriveErr
                     etype: _,
                     body,
                 } => Ok(body.clone()),
-                _ => Err(DeriveError::InferApplication(
+                expr => Err(DeriveError::InferApplication(
                     parser::stringify(lhs.clone()),
-                    format!("{context:?}"),
+                    print_ctx(context),
+                    parser::stringify(r.clone()),
                 )),
             },
             Err(e) => Err(e),
