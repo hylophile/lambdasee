@@ -109,13 +109,18 @@ fn infer_type(context: &Context, expr: Rc<Expr>) -> Result<Rc<Expr>, DeriveError
         Expr::Star => Ok(Rc::new(Expr::Box)),
         Expr::Box => Err(DeriveError::InferBox),
         Expr::Bottom => todo!(),
-        Expr::Application { lhs, rhs: _ } => match infer_type(context, lhs.clone()) {
+        Expr::Application { lhs, rhs } => match infer_type(context, lhs.clone()) {
             Ok(lhs_type) => match lhs_type.as_ref() {
                 Expr::PiAbstraction {
-                    ident: _,
+                    ident,
                     etype: _,
                     body,
-                } => Ok(body.clone()),
+                } => {
+                    let new_body = ident
+                        .as_ref()
+                        .map_or_else(|| body.clone(), |i| substitute(&body, &i, rhs));
+                    Ok(new_body)
+                }
                 _ => Err(DeriveError::InferApplication(
                     expr,
                     lhs_type,
@@ -792,23 +797,26 @@ fn derive_html() {
     // derivation_html(&d);
 }
 
-fn _substitute(expr: &Rc<Expr>, target: &str, replacement: Rc<Expr>) -> Rc<Expr> {
-    let a = &**expr;
-    match a {
-        Expr::Identifier(name) if name == target => replacement,
+fn substitute(expr: &Rc<Expr>, target: &Rc<Expr>, replacement: &Rc<Expr>) -> Rc<Expr> {
+    let target_name = match target.as_ref() {
+        Expr::Identifier(x) => x,
+        _ => unreachable!(),
+    };
+    match expr.as_ref() {
+        Expr::Identifier(name) if name == target_name => replacement.clone(),
         Expr::Application { lhs, rhs } => Rc::new(Expr::Application {
-            lhs: _substitute(lhs, target, replacement.clone()),
-            rhs: _substitute(rhs, target, replacement),
+            lhs: substitute(lhs, target, replacement),
+            rhs: substitute(rhs, target, replacement),
         }),
         Expr::LambdaAbstraction { ident, etype, body } => Rc::new(Expr::LambdaAbstraction {
             ident: ident.clone(),
-            etype: _substitute(etype, target, replacement.clone()),
-            body: _substitute(body, target, replacement),
+            etype: substitute(etype, target, replacement),
+            body: substitute(body, target, replacement),
         }),
         Expr::PiAbstraction { ident, etype, body } => Rc::new(Expr::PiAbstraction {
             ident: ident.clone(),
-            etype: _substitute(etype, target, replacement.clone()),
-            body: _substitute(body, target, replacement),
+            etype: substitute(etype, target, replacement),
+            body: substitute(body, target, replacement),
         }),
         Expr::FreeVariable { ident: _, etype: _ }
         | Expr::Judgement {
