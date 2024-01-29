@@ -711,6 +711,7 @@ pub fn derivation(s: &str) -> DedupedDerivationResult {
 }
 
 pub fn derivation_dot(d: &DedupedDerivationResult) -> String {
+    let base_fontsize = 20;
     match d {
         Ok(d) => {
             let nodes = d.iter()
@@ -727,8 +728,8 @@ pub fn derivation_dot(d: &DedupedDerivationResult) -> String {
                             None => todo!(),
                         };
                         let (style,size_normal, size_big) = match rulename {
-                            Rule::Var |Rule::Weak=> ("dotted".to_string(), 14, 18),
-                            _ => (String::new(), 18, 24)
+                            Rule::Var |Rule::Weak=> ("dotted".to_string(), base_fontsize-4, base_fontsize),
+                            _ => (String::new(), base_fontsize+4, base_fontsize+10)
                         };
                         match e {
                             Expr::Judgement {
@@ -737,12 +738,13 @@ pub fn derivation_dot(d: &DedupedDerivationResult) -> String {
                                 etype,
                             } => {
                                 format!(
-                                    "{} [label=<{{{}<br/>⊤<br/><font point-size=\"{}\">{}</font><br/>··<br/>{}|{}}}> style=\"{}\" fontsize={}];\n{}",
+                                    "{} [label=<{{{}<br/>⊤<br/><font point-size=\"{}\">{}</font><br/>··<br/>{}|<font face=\"DejaVuSerif\" point-size=\"{}\"><i>{}</i></font>}}> style=\"{}\" fontsize={}];\n{}",
                                     id,
                                     fmt_context(context),
                                     size_big,
                                     expr,
                                     etype,
+                                    size_normal-8,
                                     rulename,
                                     style,
                                     size_normal,
@@ -758,7 +760,7 @@ pub fn derivation_dot(d: &DedupedDerivationResult) -> String {
                 })
                 .collect::<Vec<_>>()
                 .join("\n");
-            format!("digraph derivation_tree {{\n\nrankdir=BT\nedge [fontsize=14 fontname=\"Julia Mono\"]\nnode [fontname=\"Julia Mono\" shape=Mrecord, style=rounded]\n{nodes}\n}}")
+            format!("digraph derivation_tree {{\n\nrankdir=BT\nedge [fontsize={base_fontsize} fontname=\"Euler Math\"]\nnode [fontname=\"Euler Math\" shape=Mrecord, style=rounded]\n{nodes}\n}}")
         }
         Err(e) => format!("{e}"),
     }
