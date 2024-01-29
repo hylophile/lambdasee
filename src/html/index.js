@@ -7,6 +7,7 @@ const queryInput = document.querySelector("#query");
 
 result.addEventListener("htmx:afterSwap", () => {
   deriveResult.innerHTML = "";
+  graphResult.innerHTML = "";
   Prism.highlightAll();
 });
 
