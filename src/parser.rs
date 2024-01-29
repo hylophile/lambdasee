@@ -10,7 +10,7 @@ use crate::expr::Expr;
 
 #[derive(pest_derive::Parser)]
 #[grammar = "grammar.pest"]
-pub struct LambdaCParser;
+pub struct LambdaC;
 
 lazy_static::lazy_static! {
     static ref PRATT_PARSER: PrattParser<Rule> = {
@@ -24,7 +24,9 @@ lazy_static::lazy_static! {
             .op(Op::infix(appl, Left))
     };
 }
+
 fn parse_expr(pairs: Pairs<Rule>) -> Expr {
+    #[allow(clippy::unwrap_used)]
     PRATT_PARSER
         .map_primary(|primary| match primary.as_rule() {
             // Rule::integer => Expr::Integer(primary.as_str().parse::<i32>().unwrap()),
@@ -47,7 +49,7 @@ fn parse_expr(pairs: Pairs<Rule>) -> Expr {
                 )));
                 let etype = Rc::new(parse_expr(inner.next().unwrap().into_inner()));
                 let body = Rc::new(parse_expr(inner.next().unwrap().into_inner()));
-                Expr::new_pi(ident, etype, body)
+                Expr::new_pi(&ident, etype, &body)
             }
             Rule::expr => parse_expr(primary.into_inner()),
             Rule::ident => Expr::Identifier(primary.as_str().into()),
@@ -112,8 +114,9 @@ fn it_works() {
 }
 
 pub fn parse_judgement(input: &str) -> Result<Expr, pest::error::Error<Rule>> {
-    match LambdaCParser::parse(Rule::judgement_program, input) {
+    match LambdaC::parse(Rule::judgement_program, input) {
         Ok(mut pairs) => {
+            #[allow(clippy::unwrap_used)]
             let a = pairs
                 .next()
                 .unwrap()

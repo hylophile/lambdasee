@@ -4,7 +4,7 @@ mod parser;
 
 #[macro_use]
 extern crate rocket;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::process::{Command, Stdio};
 
 use rocket::fs::FileServer;
@@ -29,7 +29,7 @@ fn graph(query: &str) -> String {
     let d = deriver::derivation(query);
     let dot = deriver::derivation_dot(&d);
     // println!("{dot}");
-    
+
     run(dot)
 }
 
@@ -40,7 +40,8 @@ fn rocket() -> _ {
         .mount("/", FileServer::from("src/html/"))
 }
 
-#[must_use] pub fn run(code: String) -> String {
+#[must_use]
+pub fn run(code: String) -> String {
     let mut child = Command::new("dot")
         .stdin(Stdio::piped())
         .stderr(Stdio::piped())
