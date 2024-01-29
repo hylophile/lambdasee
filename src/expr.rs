@@ -1,6 +1,6 @@
 use std::{borrow::Borrow, collections::HashSet, fmt, rc::Rc};
 
-use crate::parser;
+
 
 #[derive(Debug, PartialEq, Clone, Hash, Eq)]
 pub enum Expr {
@@ -34,20 +34,20 @@ pub enum Expr {
 }
 
 impl Expr {
-    pub fn new_pi(ident: Rc<Expr>, etype: Rc<Expr>, body: Rc<Expr>) -> Self {
+    pub fn new_pi(ident: Rc<Self>, etype: Rc<Self>, body: Rc<Self>) -> Self {
         let ident_name = match (*ident).borrow() {
-            Expr::Identifier(x) => x,
+            Self::Identifier(x) => x,
             _ => unreachable!(),
         };
         let ident = if identifier_names(body.clone()).contains(ident_name) {
-            Some(Rc::new(Expr::Identifier(ident_name.to_string())))
+            Some(Rc::new(Self::Identifier(ident_name.to_string())))
         } else {
             None
         };
         Self::PiAbstraction {
             ident,
-            etype: etype.clone(),
-            body: body.clone(),
+            etype,
+            body,
         }
     }
 }
@@ -55,28 +55,28 @@ impl Expr {
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Expr::Identifier(s) => write!(f, "{}", s.to_string()),
-            Expr::Star => write!(f, "∗"),
-            Expr::Box => write!(f, "□"),
-            Expr::Bottom => write!(f, "⊥"),
-            Expr::Application { lhs, rhs } => {
-                write!(f, "({} {})", lhs, rhs)
+            Self::Identifier(s) => write!(f, "{s}"),
+            Self::Star => write!(f, "∗"),
+            Self::Box => write!(f, "□"),
+            Self::Bottom => write!(f, "⊥"),
+            Self::Application { lhs, rhs } => {
+                write!(f, "({lhs} {rhs})")
             }
-            Expr::LambdaAbstraction { ident, etype, body } => {
-                write!(f, "(λ{} : {} . {})", ident, etype, body)
+            Self::LambdaAbstraction { ident, etype, body } => {
+                write!(f, "(λ{ident} : {etype} . {body})")
             }
-            Expr::PiAbstraction { ident, etype, body } => match ident {
+            Self::PiAbstraction { ident, etype, body } => match ident {
                 Some(i) => {
-                    write!(f, "(Π{} : {} . {})", i, etype, body)
+                    write!(f, "(Π{i} : {etype} . {body})")
                 }
                 None => {
-                    write!(f, "({} → {})", etype, body)
+                    write!(f, "({etype} → {body})")
                 }
             },
-            Expr::FreeVariable { ident, etype } => {
-                write!(f, "{} : {}", ident, etype)
+            Self::FreeVariable { ident, etype } => {
+                write!(f, "{ident} : {etype}")
             }
-            Expr::Judgement {
+            Self::Judgement {
                 context,
                 expr,
                 etype,
@@ -110,7 +110,7 @@ pub fn htmlify(e: &Expr) -> String {
         } => {
             format!(
                 r#"<code class="context">{}</code><code class="turnstile"> ⊢ </code><code class="expr">{}</code><code class="type-symbol"> : </code><code class="type">{}</code>"#,
-                fmt_context(&context),
+                fmt_context(context),
                 expr,
                 etype
             )

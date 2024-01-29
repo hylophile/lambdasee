@@ -10,7 +10,7 @@ use thiserror::Error;
 
 use crate::{
     expr::{fmt_context, identifier_names, Context, Expr},
-    parser::{self, parse_judgement},
+    parser::{parse_judgement},
 };
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
@@ -30,7 +30,7 @@ impl fmt::Display for Rule {
         // write!(f, "({}, {})", self.0, self.1)
         let s = match self {
             // Rule::Var => " (var)".to_string(),
-            Self::Form(s1, s2) => format!("(form ({},{}))", s1, s2),
+            Self::Form(s1, s2) => format!("(form ({s1},{s2}))"),
             _ => format!("({self:?})").to_lowercase(),
         };
         write!(f, "{s}")
@@ -108,7 +108,7 @@ fn find_type_in_context(ident: &Expr, context: &Context) -> Option<Rc<Expr>> {
 
 fn infer_type(context: &Context, expr: Rc<Expr>) -> Result<Rc<Expr>, DeriveError> {
     match expr.as_ref() {
-        Expr::Identifier(_) => find_type_in_context(&expr, &context)
+        Expr::Identifier(_) => find_type_in_context(&expr, context)
             .ok_or(DeriveError::InferIdentifier(expr, context.clone())),
         Expr::Star => Ok(Rc::new(Expr::Box)),
         Expr::Box => Err(DeriveError::InferBox),
@@ -199,7 +199,7 @@ fn derive_h(
                 return Ok(Derivation {
                     rule: Rule::Sort,
                     conclusion: Expr::Judgement {
-                        context: context.to_vec(),
+                        context: context.clone(),
                         expr: (judgement_expr),
                         etype: (judgement_type),
                     },
@@ -219,7 +219,7 @@ fn derive_h(
                         // println!("{ident:?}, {expr:?}, {ident_type:?}, {etype:?}");
                         let last_fv = ident;
                         let last_fv_type = ident_type;
-                        let new_context = all_except_last(context.to_vec());
+                        let new_context = all_except_last(context.clone());
 
                         // println!(
                         //     "\n{:?}\n{:?}\n{:?}\n{:?}\n",
@@ -245,7 +245,7 @@ fn derive_h(
                             return Ok(Derivation {
                                 rule: Rule::Var,
                                 conclusion: Expr::Judgement {
-                                    context: context.to_vec(),
+                                    context: context.clone(),
                                     expr: (judgement_expr),
                                     etype: (judgement_type),
                                 },
@@ -257,7 +257,7 @@ fn derive_h(
                         match *judgement_expr {
                             Expr::Identifier(_) | Expr::Star => {
                                 let conclusion = Expr::Judgement {
-                                    context: context.to_vec(),
+                                    context: context.clone(),
                                     expr: (judgement_expr.clone()),
                                     etype: (judgement_type.clone()),
                                 };
@@ -318,7 +318,7 @@ fn derive_h(
                 let premiss_one = match p1_type.clone() {
                     Ok(t) => Some(Rc::new(derive_h(
                         Expr::Judgement {
-                            context: context.to_vec(),
+                            context: context.clone(),
                             expr: pi_type.clone(),
                             etype: (t),
                         }
@@ -338,7 +338,7 @@ fn derive_h(
 
                 let premiss_two = Some(Rc::new(derive_h(
                     Expr::Judgement {
-                        context: append_to_context(pi_ident, pi_type.clone(), context.to_vec()),
+                        context: append_to_context(pi_ident, pi_type.clone(), context.clone()),
                         expr: pi_body.clone(),
                         etype: (judgement_type.clone()),
                     }
@@ -353,7 +353,7 @@ fn derive_h(
                             return Ok(Derivation {
                                 rule: Rule::Form(s1, s2),
                                 conclusion: Expr::Judgement {
-                                    context: context.to_vec(),
+                                    context,
                                     expr: (judgement_expr),
                                     etype: (judgement_type),
                                 },
@@ -384,7 +384,7 @@ fn derive_h(
                 // };
                 let p1 = Some(Rc::new(derive_h(
                     Expr::Judgement {
-                        context: context.to_vec(),
+                        context: context.clone(),
                         expr: lhs.clone(),
                         etype: (p1_type),
                     }
@@ -394,7 +394,7 @@ fn derive_h(
 
                 let p2 = Some(Rc::new(derive_h(
                     Expr::Judgement {
-                        context: context.to_vec(),
+                        context: context.clone(),
                         expr: rhs.clone(),
                         etype: (p2_type),
                     }
@@ -405,7 +405,7 @@ fn derive_h(
                 return Ok(Derivation {
                     rule: Rule::Appl,
                     conclusion: Expr::Judgement {
-                        context: context.to_vec(),
+                        context,
                         expr: (judgement_expr),
                         etype: (judgement_type),
                     },
@@ -457,7 +457,7 @@ fn derive_h(
                 return Ok(Derivation {
                     rule: Rule::Abst,
                     conclusion: Expr::Judgement {
-                        context: context.to_vec(),
+                        context,
                         expr: (judgement_expr),
                         etype: (judgement_type),
                     },
@@ -698,17 +698,17 @@ pub fn derivation_dot(d: &DedupedDerivationResult) -> String {
                     CacheEntry::Expr(e) => {
                         let (rulename, refs) = match ruleref {
                             Some(r) => match r {
-                                RuleRef::None(r) => (r, "".to_string()),
-                                RuleRef::One(r, ref1) => (r, format!("{} -> {} [labeldistance=2 headlabel=\"1\"];", ref1,id )),
+                                RuleRef::None(r) => (r, String::new()),
+                                RuleRef::One(r, ref1) => (r, format!("{ref1} -> {id} [labeldistance=2 headlabel=\"1\"];" )),
                                 RuleRef::Two(r, ref1, ref2) => {
-                                    (r, format!("{} -> {} [labeldistance=2 headlabel=\"1\"];\n{} -> {} [labeldistance=2 headlabel=\"2\"];", ref1, id, ref2, id))
+                                    (r, format!("{ref1} -> {id} [labeldistance=2 headlabel=\"1\"];\n{ref2} -> {id} [labeldistance=2 headlabel=\"2\"];"))
                                 }
                             },
                             None => todo!(),
                         };
                         let (style,size_normal, size_big) = match rulename {
                             Rule::Var |Rule::Weak=> ("dotted".to_string(), 8, 12),
-                            _ => ("".to_string(), 14, 20)
+                            _ => (String::new(), 14, 20)
                         };
                         match e {
                             Expr::Judgement {
@@ -770,10 +770,10 @@ pub fn derivation_html(d: &DedupedDerivationResult) -> String {
 #[test]
 fn derive_html() {
     let s ="a:*,b:*,S : ∗, Q : S → S → ∗ |- (Πx:S. /y : S . (Q x y → Q y x → (/a:*.a))) → Πz : S . (Q z z → (/b:*.b)) : *";
-    let d = derivation(s);
-    let d = derivation(s);
-    let d = derivation(s);
-    let d = derivation(s);
+    let _d = derivation(s);
+    let _d = derivation(s);
+    let _d = derivation(s);
+    let _d = derivation(s);
     // derivation_html(&d);
 }
 
@@ -783,17 +783,17 @@ fn substitute(expr: &Rc<Expr>, target: &str, replacement: Rc<Expr>) -> Rc<Expr> 
         Expr::Identifier(name) if name == target => replacement,
         Expr::Application { lhs, rhs } => Rc::new(Expr::Application {
             lhs: substitute(lhs, target, replacement.clone()),
-            rhs: substitute(rhs, target, replacement.clone()),
+            rhs: substitute(rhs, target, replacement),
         }),
         Expr::LambdaAbstraction { ident, etype, body } => Rc::new(Expr::LambdaAbstraction {
             ident: ident.clone(),
             etype: substitute(etype, target, replacement.clone()),
-            body: substitute(body, target, replacement.clone()),
+            body: substitute(body, target, replacement),
         }),
         Expr::PiAbstraction { ident, etype, body } => Rc::new(Expr::PiAbstraction {
             ident: ident.clone(),
             etype: substitute(etype, target, replacement.clone()),
-            body: substitute(body, target, replacement.clone()),
+            body: substitute(body, target, replacement),
         }),
         Expr::FreeVariable { ident: _, etype: _ } => unreachable!(),
         Expr::Judgement {
@@ -834,7 +834,7 @@ fn new_ident_name(expr: Rc<Expr>, global_ident_names: &HashSet<String>) -> Strin
 
 #[test]
 fn ident_name() {
-    let s = "a:*,b:*,x:*,y:*,z:*|-a:*";
+    let _s = "a:*,b:*,x:*,y:*,z:*|-a:*";
 
     let s = "S : ∗, P : S → ∗, A : ∗ |- (Πx : S . (A → P x)) → A → Πy : S . P y : *";
     let j = parser::parse_judgement(s).unwrap();

@@ -29,8 +29,8 @@ fn graph(query: &str) -> String {
     let d = deriver::derivation(query);
     let dot = deriver::derivation_dot(&d);
     // println!("{dot}");
-    let svg = run(dot);
-    svg
+    
+    run(dot)
 }
 
 #[launch]
@@ -40,7 +40,7 @@ fn rocket() -> _ {
         .mount("/", FileServer::from("src/html/"))
 }
 
-pub fn run(code: String) -> String {
+#[must_use] pub fn run(code: String) -> String {
     let mut child = Command::new("dot")
         .stdin(Stdio::piped())
         .stderr(Stdio::piped())
