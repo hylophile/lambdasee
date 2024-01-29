@@ -10,7 +10,7 @@ use thiserror::Error;
 
 use crate::{
     expr::{fmt_context, identifier_names, Context, Expr},
-    parser::{parse_judgement, self},
+    parser::{self, parse_judgement},
 };
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
@@ -706,14 +706,9 @@ pub fn derivation_dot(d: &DedupedDerivationResult) -> String {
                             },
                             None => todo!(),
                         };
-                        let style = match rulename {
-                            Rule::Sort => "".to_string(),
-                            Rule::Var => "dotted".to_string(),
-                            Rule::Weak => "dotted".to_string(),
-                            Rule::Form(_, _) => "".to_string(),
-                            Rule::Appl => "".to_string(),
-                            Rule::Abst => "".to_string(),
-                            Rule::Conv => "".to_string(),
+                        let (style,size_normal, size_big) = match rulename {
+                            Rule::Var |Rule::Weak=> ("dotted".to_string(), 8, 12),
+                            _ => ("".to_string(), 14, 20)
                         };
                         match e {
                             Expr::Judgement {
@@ -722,17 +717,15 @@ pub fn derivation_dot(d: &DedupedDerivationResult) -> String {
                                 etype,
                             } => {
                                 format!(
-                                    // "{} [label=<{{{}<br/>⊢<br/><font point-size=\"20\">{}</font><br/>:<br/>{}|{}}}> style=\"{}\"];\n{}",
-                                    "{} [label=<{{{}<br/>⊤<br/><font point-size=\"20\">{}</font><br/>··<br/>{}|{}}}> style=\"{}\"];\n{}",
-                                    // "{} [label=<{{{}<br/>⊤<br/><font point-size=\"20\">{}</font><br/>. .<br/>{}|{}}}> style=\"{}\"];\n{}",
-                                    // "{} [label=<{{{}<br/>⊤<br/><font point-size=\"20\">{}</font><br/>⊢· ·<br/>{}|{}}}> style=\"{}\"];\n{}",
-                                    // "{} [label=<{}|<b>{}</b>|{}|{}>];\n{}",
+                                    "{} [label=<{{{}<br/>⊤<br/><font point-size=\"{}\">{}</font><br/>··<br/>{}|{}}}> style=\"{}\" fontsize={}];\n{}",
                                     id,
                                     fmt_context(context),
+                                    size_big,
                                     expr,
                                     etype,
                                     rulename,
                                     style,
+                                    size_normal,
                                     refs
                                 )
                             }
@@ -745,7 +738,7 @@ pub fn derivation_dot(d: &DedupedDerivationResult) -> String {
                 })
                 .collect::<Vec<_>>()
                 .join("\n");
-            format!("digraph derivation_tree {{\nfontname=\"Helvetica-14\"\nrankdir=BT\nnode [shape=Mrecord, style=rounded]\n{nodes}\n}}")
+            format!("digraph derivation_tree {{\n\nrankdir=BT\nedge [fontsize=10 fontname=\"Noto Serif\"]\nnode [fontname=\"Noto Serif\" shape=Mrecord, style=rounded]\n{nodes}\n}}")
         }
         Err(e) => format!("{e}"),
     }
@@ -853,8 +846,8 @@ fn ident_name() {
     // assert_eq!(ns, vec!["A", "P", "S", "x", "y"]);
 }
 
-// a:*->*,b:*,m:a->b,n:a |- a b : *
-// S : ∗, P : S → ∗, A : ∗ |- (Πx : S . (A → P x)) → A → Πy : S . P y : *    panic
-// a:*,b:*,S : ∗, Q : S → S → ∗ |- (Πx:S. /y : S . (Q x y → Q y x → (/a:*.a))) → Πz : S . (Q z z → (/b:*.b)) : *
-// a:*,b:*,x:a,y:a->b |- (/x:c.(y x)) :*   panic
+// a:*,b:*,m:a->b,n:a |- m n : b
+// S : ∗, P : S → ∗, A : ∗ |- (Πx : S . (A → P x)) → A → Πy : S . P y : *
+// S : ∗, Q : S → S → ∗ |- (Πx:S. /y : S . (Q x y → Q y x → (/a:*.a))) → Πz : S . (Q z z → (/b:*.b)) : *
 //b:* |- (\a:b.a a) : (/a:b.b)    cant infer a
+// a:*,b:*,x:a,y:a->b |- (\x:c.(y x)) :b   TODO sanity check (lambda using x as free variable)
