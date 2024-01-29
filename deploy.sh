@@ -1,4 +1,6 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
+
+set -euxo pipefail
 
 cargo build --release
 cp target/release/lambdasee .
@@ -8,4 +10,4 @@ rclone copy -LP lambdasee mve:web/web/lambdasee/
 rm lambdasee
 rclone copy -LP src/html/ mve:web/web/lambdasee/src/html
 
-# pkill lambdasee || cd web/web/lambdasee && chmod +x lambdasee && nohup ./lambdasee > /var/log/lambdasee.log 2>&1 &
+# 'pkill lambdasee || cd web/web/lambdasee && chmod +x lambdasee && nohup ./lambdasee > /var/log/lambdasee.log 2>&1 &'

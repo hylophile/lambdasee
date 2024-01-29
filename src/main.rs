@@ -28,6 +28,7 @@ fn derive(query: &str) -> String {
 fn graph(query: &str) -> String {
     let d = deriver::derivation(query);
     let dot = deriver::derivation_dot(&d);
+    // println!("{dot}");
     let svg = run(dot);
     svg
 }
