@@ -163,6 +163,27 @@ fn all_except_last(context: &Context) -> Context {
 fn derive(judgement: Rc<Expr>) -> Result<Derivation, DeriveError> {
     let global_ident_names = identifier_names(&judgement);
 
+    let judgement = match judgement.as_ref() {
+        Expr::Judgement {
+            context,
+            expr,
+            etype,
+        } => {
+            if **etype == Expr::Infer {
+                let inferred_type = infer_type(context, expr.clone())?;
+                Expr::Judgement {
+                    context: context.clone(),
+                    expr: expr.clone(),
+                    etype: inferred_type,
+                }
+                .into()
+            } else {
+                judgement
+            }
+        }
+        _ => unreachable!(),
+    };
+
     derive_h(judgement, &global_ident_names)
 }
 
@@ -289,7 +310,6 @@ fn derive_h(
                             }
                             _ => (),
                         }
-                        // TODO how to match weak? later?
                     }
                     _ => unreachable!(),
                 }

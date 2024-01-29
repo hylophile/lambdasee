@@ -9,6 +9,8 @@ star        =  { "∗" | "*" }
 ebox        =  { "□" | "#" }
 body        =  { expr }
 etype       =  { expr }
+infer       =  { "?" }
+jtype       =  { expr | infer }
 scope       = _{ "(" ~ expr ~ ")" }
 bottom      =  { "⊥" | "_|_" }
 primary     = _{ star | ebox | bottom | lambda | pi | ident | scope }
@@ -22,7 +24,7 @@ gamma       = _{ "Γ" | "C" }
 empty_set   = _{ "∅" | "{}" | "0" }
 context     =  { empty_set | (gamma ~ ("," ~ free_vars)?) | free_vars }
 judges      = _{ "⊢" | "|-" }
-judgement   =  { context ~ judges ~ expr ~ ":" ~ etype }
+judgement   =  { context ~ judges ~ expr ~ ":" ~ jtype }
 
 program = _{ SOI ~ expr ~ ("\n" ~ expr)* ~ EOI }
 

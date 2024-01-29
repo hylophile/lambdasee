@@ -6,6 +6,7 @@ pub enum Expr {
     Star,
     Box,
     Bottom,
+    Infer,
     Application {
         lhs: Rc<Expr>,
         rhs: Rc<Expr>,
@@ -56,6 +57,7 @@ impl fmt::Display for Expr {
             Self::Star => write!(f, "∗"),
             Self::Box => write!(f, "□"),
             Self::Bottom => write!(f, "⊥"),
+            Self::Infer => write!(f, "?"),
             Self::Application { lhs, rhs } => {
                 write!(f, "({lhs} {rhs})")
             }
