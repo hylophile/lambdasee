@@ -70,7 +70,7 @@ impl fmt::Display for Expr {
                     write!(f, "(Π{} : {} . {})", i, etype, body)
                 }
                 None => {
-                    write!(f, "{} → {}", etype, body)
+                    write!(f, "({} → {})", etype, body)
                 }
             },
             Expr::FreeVariable { ident, etype } => {
