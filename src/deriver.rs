@@ -744,7 +744,7 @@ pub fn derivation_dot(d: &DedupedDerivationResult) -> String {
                                     size_big,
                                     expr,
                                     etype,
-                                    size_normal-8,
+                                    base_fontsize-6,
                                     rulename,
                                     style,
                                     size_normal,
