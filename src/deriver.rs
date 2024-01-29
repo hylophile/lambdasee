@@ -727,8 +727,8 @@ pub fn derivation_dot(d: &DedupedDerivationResult) -> String {
                             None => todo!(),
                         };
                         let (style,size_normal, size_big) = match rulename {
-                            Rule::Var |Rule::Weak=> ("dotted".to_string(), 8, 12),
-                            _ => (String::new(), 14, 20)
+                            Rule::Var |Rule::Weak=> ("dotted".to_string(), 14, 18),
+                            _ => (String::new(), 18, 24)
                         };
                         match e {
                             Expr::Judgement {
@@ -758,7 +758,7 @@ pub fn derivation_dot(d: &DedupedDerivationResult) -> String {
                 })
                 .collect::<Vec<_>>()
                 .join("\n");
-            format!("digraph derivation_tree {{\n\nrankdir=BT\nedge [fontsize=10 fontname=\"Noto Serif\"]\nnode [fontname=\"Noto Serif\" shape=Mrecord, style=rounded]\n{nodes}\n}}")
+            format!("digraph derivation_tree {{\n\nrankdir=BT\nedge [fontsize=14 fontname=\"Julia Mono\"]\nnode [fontname=\"Julia Mono\" shape=Mrecord, style=rounded]\n{nodes}\n}}")
         }
         Err(e) => format!("{e}"),
     }
@@ -872,5 +872,6 @@ fn ident_name() {
 // a:*,b:*,m:a->b,n:a |- m n : b
 // S : ∗, P : S → ∗, A : ∗ |- (Πx : S . (A → P x)) → A → Πy : S . P y : *
 // S : ∗, Q : S → S → ∗ |- (Πx:S. /y : S . (Q x y → Q y x → (/a:*.a))) → Πz : S . (Q z z → (/b:*.b)) : *
-//b:* |- (\a:b.a a) : (/a:b.b)    cant infer a
+// b:* |- (\a:b.a a) : (/a:b.b)    cant infer a
 // a:*,b:*,x:a,y:a->b |- (\x:c.(y x)) :b   TODO sanity check (lambda using x as free variable)
+// a:*,b:a->*,m:(/x:a.b x),n:a |- m n : ?
