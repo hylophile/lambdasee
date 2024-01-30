@@ -404,38 +404,34 @@ fn derive_h(
 
             // Appl
             if let Expr::Application { lhs, rhs } = judgement_expr.as_ref() {
-                // TODO B[x:=N] in reverse
-                // TODO new free variable "x"
+                let p1_type = infer_type(&context, lhs.clone());
+                let p2_type = infer_type(&context, rhs.clone());
 
-                let p1_type = infer_type(&context, lhs.clone())?;
-                let p2_type = infer_type(&context, rhs.clone())?;
-                // TODO check p1_type == piabstr && pitype == p2_type && pibody == pibody[x:=N]
+                let p1 = Some(match p1_type {
+                    Ok(p1_type) => Rc::new(derive_h(
+                        Expr::Judgement {
+                            context: context.clone(),
+                            expr: lhs.clone(),
+                            etype: (p1_type),
+                        }
+                        .into(),
+                        global_ident_names,
+                    )),
+                    Err(err) => Err(err).into(),
+                });
 
-                // let p1_type = Expr::PiAbstraction {
-                //     // ident: Some(Rc::new(Expr::Identifier("x".to_string()))),
-                //     ident: None,
-                //     etype: Rc::new(b.clone()),
-                //     body: Rc::new(judgement_type.clone()),
-                // };
-                let p1 = Some(Rc::new(derive_h(
-                    Expr::Judgement {
-                        context: context.clone(),
-                        expr: lhs.clone(),
-                        etype: (p1_type),
-                    }
-                    .into(),
-                    global_ident_names,
-                )));
-
-                let p2 = Some(Rc::new(derive_h(
-                    Expr::Judgement {
-                        context: context.clone(),
-                        expr: rhs.clone(),
-                        etype: (p2_type),
-                    }
-                    .into(),
-                    global_ident_names,
-                )));
+                let p2 = Some(match p2_type {
+                    Ok(p2_type) => Rc::new(derive_h(
+                        Expr::Judgement {
+                            context: context.clone(),
+                            expr: rhs.clone(),
+                            etype: (p2_type),
+                        }
+                        .into(),
+                        global_ident_names,
+                    )),
+                    Err(err) => Err(err).into(),
+                });
 
                 return Ok(Derivation {
                     rule: Rule::Appl,
@@ -892,3 +888,5 @@ fn ident_name() {
 // b:* |- (\a:b.a a) : (/a:b.b)    cant infer a
 // a:*,b:*,x:a,y:a->b |- (\x:c.(y x)) :b   TODO sanity check (lambda using x as free variable)
 // a:*,b:a->*,m:(/x:a.b x),n:a |- m n : ?
+// S : ∗, Q : S → S → ∗ ⊢ λz : (Πx : S . Πy : S . Q x y) . λu : S . z u u : ?
+// a:*,b:*,n:b,m:a->b|-m n:? fail
