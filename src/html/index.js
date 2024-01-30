@@ -25,7 +25,7 @@ graphResult.addEventListener("htmx:afterSwap", () => {
 
 queryInput.addEventListener("input", () => {
   window.location.replace(
-    "#query=" + btoa(encodeURIComponent(queryInput.innerText)),
+    "#query=" + btoa(encodeURIComponent(queryInput.value)),
   );
 });
 
@@ -34,7 +34,7 @@ window.addEventListener("load", () => {
   const encodedValue = hashValue.split("=")[1];
 
   if (encodedValue) {
-    queryInput.innerText = decodeURIComponent(atob(encodedValue));
+    queryInput.value = decodeURIComponent(atob(encodedValue));
     queryInput.dispatchEvent(new Event("input"));
   }
 });

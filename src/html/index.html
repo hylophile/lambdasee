@@ -48,44 +48,42 @@
     <main class="flex">
       <h1 style="margin: 0 auto">λ•</h1>
       <span style="margin: 0 auto">
-        parse, visualize, and (soon™) derive expressions of λC & friends
+        parse, visualize, and derive expressions of λC & friends
       </span>
       <hr />
-      <span
+      <input
         class="input"
-        role="textbox"
-        contenteditable
         name="query"
         style="resize: vertical"
         id="query"
         hx-get="/parse"
         hx-trigger="input[key == 'Enter' || document.querySelector('#auto').checked]"
-        hx-vals="js: query:normalize(htmx.find('#query').innerText)"
         hx-target="#parse-result"
         placeholder="Parse..."
-      ></span>
+      ></input>
       <label>
         <input type="checkbox" id="auto" checked />
         reload on change
       </label>
-      <div style="margin: 1rem 0">
+      <div style="margin: 1em 0">
         <span>Parse:</span>
         <pre
           id="parse-result"
           class="language-lisp rainbow-braces match-braces"
         ><code></code></pre>
+        <span>Derive:</span>
         <button
           id="derive-query"
           hx-get="/derive"
-          hx-vals="js: query:normalize(htmx.find('#query').innerText)"
+          hx-vals="js: query:normalize(htmx.find('#query').value)"
           hx-target="#derive-result"
         >
-          Derive
+          Text
         </button>
         <button
           id="graph-query"
           hx-get="/graph"
-          hx-vals="js: query:normalize(htmx.find('#query').innerText)"
+          hx-vals="js: query:normalize(htmx.find('#query').value)"
           hx-target="#graph-result"
         >
           Graph
