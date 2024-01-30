@@ -51,7 +51,7 @@ pub enum DeriveError {
     #[error("Derivation not implemented for judgement {0}.")]
     NotImplemented(Rc<Expr>),
 
-    #[error("Unexpected type {0} in judgement {1}.\\nThe type of a Pi abstraction must be a sort (either ∗ or □).")]
+    #[error("Unexpected type {0} in judgement {1}.\nThe type of a Pi abstraction must be a sort (either ∗ or □).")]
     UnexpectedPiAbstractionType(Rc<Expr>, Rc<Expr>),
 
     #[error("Can't infer identifier {0} in context {}.", fmt_context(.1))]
@@ -60,14 +60,14 @@ pub enum DeriveError {
     #[error("Can't infer the type of □.")]
     InferBox,
 
-    #[error("Unexpected type in application {0} in context {}.\\nExpected {1} to be a Pi abstraction but found {1} : {2}.", fmt_context(.3))]
+    #[error("Unexpected type in application {0} in context {}.\nExpected {1} to be a Pi abstraction but found {1} : {2}.", fmt_context(.3))]
     InferApplicationLHS(Rc<Expr>, Rc<Expr>, Rc<Expr>, Context),
 
-    #[error("Unexpected type in application {0} in context {}.\\nExpected {1} : {2}, but found {1} : {3}.", fmt_context(.4))]
+    #[error("Unexpected type in application {0} in context {}.\nExpected {1} : {2}, but found {1} : {3}.", fmt_context(.4))]
     InferApplicationRHS(Rc<Expr>, Rc<Expr>, Rc<Expr>, Rc<Expr>, Context),
 
     #[error(
-        "Form rule inferred (s1,s2) = ({0},{1}), \\nbut s1 and s2 can only be sorts (either ∗ or □)."
+        "Form rule inferred (s1,s2) = ({0},{1}), \nbut s1 and s2 can only be sorts (either ∗ or □)."
     )]
     InferForm(Rc<Expr>, Rc<Expr>),
 
@@ -766,7 +766,8 @@ pub fn derivation_dot(d: &DedupedDerivationResult) -> String {
                         }
                     }
                     CacheEntry::DeriveError(e) => {
-                        format!(r#"[{id}]{e}"#)
+                        let e = format!("{e}").replace("\n", "\\n");
+                        format!("{id} [label=\"{}\" fillcolor=\"#ff000030\" margin=\"1.0\" fontsize={} style=\"filled\"]\n;", e, base_fontsize+10 )
                     }
                 })
                 .collect::<Vec<_>>()
