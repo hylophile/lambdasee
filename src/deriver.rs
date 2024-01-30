@@ -51,7 +51,7 @@ pub enum DeriveError {
     #[error("Derivation not implemented for judgement {0}.")]
     NotImplemented(Rc<Expr>),
 
-    #[error("Unexpected type {0} in judgement {1}.\nThe type of a Pi abstraction must be a sort (either ∗ or □).")]
+    #[error("Unexpected type {0} in judgement {1}.\\nThe type of a Pi abstraction must be a sort (either ∗ or □).")]
     UnexpectedPiAbstractionType(Rc<Expr>, Rc<Expr>),
 
     #[error("Can't infer identifier {0} in context {}.", fmt_context(.1))]
@@ -60,11 +60,14 @@ pub enum DeriveError {
     #[error("Can't infer the type of □.")]
     InferBox,
 
-    #[error("Unexpected type in application {0} in context {}.\nExpected Pi abstraction but found {1}.", fmt_context(.2))]
-    InferApplication(Rc<Expr>, Rc<Expr>, Context),
+    #[error("Unexpected type in application {0} in context {}.\\nExpected {1} to be a Pi abstraction but found {1} : {2}.", fmt_context(.3))]
+    InferApplicationLHS(Rc<Expr>, Rc<Expr>, Rc<Expr>, Context),
+
+    #[error("Unexpected type in application {0} in context {}.\\nExpected {1} : {2}, but found {1} : {3}.", fmt_context(.4))]
+    InferApplicationRHS(Rc<Expr>, Rc<Expr>, Rc<Expr>, Rc<Expr>, Context),
 
     #[error(
-        "Form rule inferred (s1,s2) = ({0},{1}), but s1 and s2 can only be sorts (either ∗ or □)."
+        "Form rule inferred (s1,s2) = ({0},{1}), \\nbut s1 and s2 can only be sorts (either ∗ or □)."
     )]
     InferForm(Rc<Expr>, Rc<Expr>),
 
@@ -113,16 +116,28 @@ fn infer_type(context: &Context, expr: Rc<Expr>) -> Result<Rc<Expr>, DeriveError
             Ok(lhs_type) => match lhs_type.as_ref() {
                 Expr::PiAbstraction {
                     ident,
-                    etype: _,
+                    etype: type_of_rhs,
                     body,
                 } => {
+                    let inferred_type_of_rhs = infer_type(context, rhs.clone())?;
+                    if type_of_rhs.clone() != inferred_type_of_rhs {
+                        let rc = Err(DeriveError::InferApplicationRHS(
+                            expr.clone(),
+                            rhs.clone(),
+                            type_of_rhs.clone(),
+                            inferred_type_of_rhs,
+                            context.clone(),
+                        ));
+                        return rc;
+                    };
                     let new_body = ident
                         .as_ref()
                         .map_or_else(|| body.clone(), |i| substitute(&body, &i, rhs));
                     Ok(new_body)
                 }
-                _ => Err(DeriveError::InferApplication(
-                    expr,
+                _ => Err(DeriveError::InferApplicationLHS(
+                    expr.clone(),
+                    lhs.clone(),
                     lhs_type,
                     context.clone(),
                 )),
